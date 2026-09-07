@@ -2385,7 +2385,8 @@ function wireVenmo(){
 
 
 /* ================= MISSING RECEIPT AFFIDAVIT ================= */
-var MR_PAY=['Business Debit Card','Business Credit Card','Check','Cash','Other'];
+var MR_PAY=['Cash / VolFed Business Checking','Venmo Business Account','AMEX Credit Card'];
+var MR_PAY_SKIP=/savings/i;
 var MR_CAT=['Shop Supplies','Parts (COGS)','Tools / Equipment','Fuel / Vehicle','Other'];
 var MR_WHY=['Receipt lost or misplaced','Receipt never provided by vendor','Receipt damaged / illegible','Electronic receipt not received / deleted','Other'];
 var MR_DOCS=['Bank statement','Credit card statement','Vendor account history / reprinted invoice','Email confirmation','Purchase order record','None available'];
@@ -2400,6 +2401,18 @@ function mrCatList(){
   var h='<datalist id="mr-cat-list">';
   for(var k=0;k<out.length;k++) h+='<option value="'+esc(out[k])+'"></option>';
   return h+'</datalist>';
+}
+function mrPayList(){
+  var out=[], A=(DATA&&DATA.accounts)||[];
+  for(var i=0;i<A.length;i++){
+    var n=A[i].name, c=String(A[i].code==null?'':A[i].code);
+    if(!n||!A[i].isMoney||A[i].archived) continue;
+    if(c==='1010'||MR_PAY_SKIP.test(n)) continue;
+    out.push(n);
+  }
+  if(!out.length) out=MR_PAY.slice();
+  out.push('Other');
+  return out;
 }
 function mrOpts(arr){ var h='<option value=""></option>'; for(var i=0;i<arr.length;i++) h+='<option>'+esc(arr[i])+'</option>'; return h; }
 function mrRecall(k){ try{ return localStorage.getItem(k)||''; }catch(e){ return ''; } }
@@ -2419,7 +2432,7 @@ function vMR(){
       +'<div><label for="mr-vendor">Vendor / payee</label><input type="text" id="mr-vendor" placeholder="Aircraft Spruce"></div></div>'
     +'<div class="form-row"><div><label for="mr-amt">Amount</label><input type="text" id="mr-amt" inputmode="decimal" placeholder="0.00"></div>'
       +'<div><label for="mr-job">Related job / aircraft</label><input type="text" id="mr-job" placeholder="N3115W"></div></div>'
-    +'<div class="form-row"><div><label for="mr-pay">Payment method</label><select id="mr-pay">'+mrOpts(MR_PAY)+'</select></div>'
+    +'<div class="form-row"><div><label for="mr-pay">Payment method</label><select id="mr-pay">'+mrOpts(mrPayList())+'</select></div>'
       +'<div><label for="mr-cat">Expense category</label><input type="text" id="mr-cat" list="mr-cat-list" autocomplete="off">'+mrCatList()+'</div></div>'
   +'</div>'
   +'<div class="grid g2" style="margin-top:16px">'
