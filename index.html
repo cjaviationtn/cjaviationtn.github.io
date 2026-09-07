@@ -14,6 +14,16 @@
 <link rel="apple-touch-icon" href="img/logo.png">
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="css/app.css">
+<script>
+/* Force https. GitHub Pages redirects http -> https, but a browser can still
+ * serve a cached http copy, and Google sign-in rejects http origins outright
+ * (Error 400: origin_mismatch). This bounces before anything else loads. */
+(function(){
+  if (location.protocol === 'http:' && location.hostname.indexOf('localhost') === -1) {
+    location.replace('https://' + location.host + location.pathname + location.search + location.hash);
+  }
+})();
+</script>
 <script src="config.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
