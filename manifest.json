@@ -1,0 +1,9 @@
+{
+  "name": "C&J Aviation Accounting/Admin",
+  "short_name": "C&J Admin",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#2B4865",
+  "theme_color": "#2B4865",
+  "icons": [{ "src": "img/logo.png", "sizes": "160x160", "type": "image/png" }]
+}
