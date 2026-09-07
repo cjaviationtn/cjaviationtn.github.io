@@ -64,9 +64,11 @@ var NAV=[
   ['vendors','⚑','Vendor Rules'],
   ['po','◨','Purchase Orders'],
   ['pay','$','Payroll'],
-  ['cal','🔧','CTK']
+  ['cal','🔧','CTK'],
+  ['venmo','％','Venmo Fee'],
+  ['mr','✎','Missing Receipt']
 ];
-var VIEW_TITLE={dashboard:'Dashboard',entry:'New Transaction',ledger:'General Ledger',tbx:'TBX Invoice Summary',pl:'Income Statement (P&L)',bs:'Balance Sheet',equity:'Member Equity',coa:'Chart of Accounts',vendors:'Vendor Rules',po:'Purchase Orders',pay:'Payroll',cal:'CTK — Calibrated Tool Kit'};
+var VIEW_TITLE={dashboard:'Dashboard',entry:'New Transaction',ledger:'General Ledger',tbx:'TBX Invoice Summary',pl:'Income Statement (P&L)',bs:'Balance Sheet',equity:'Member Equity',coa:'Chart of Accounts',vendors:'Vendor Rules',po:'Purchase Orders',pay:'Payroll',cal:'CTK — Calibrated Tool Kit',venmo:'Venmo Fee Calculator',mr:'Missing Receipt Affidavit'};
 
 var SIDE_NARROW=false;
 try{ SIDE_NARROW = (localStorage.getItem('cj_side')==='1'); }catch(e){}
@@ -104,7 +106,7 @@ function buildShell(){
 }
 
 
-var VIEWS={dashboard:vDashboard,entry:vEntry,ledger:vLedger,tbx:vTBX,pl:vPL,bs:vBS,equity:vEquity,coa:vCOA,vendors:vVendors,po:vPO,pay:vPay,cal:vCal};
+var VIEWS={dashboard:vDashboard,entry:vEntry,ledger:vLedger,tbx:vTBX,pl:vPL,bs:vBS,equity:vEquity,coa:vCOA,vendors:vVendors,po:vPO,pay:vPay,cal:vCal,venmo:vVenmo,mr:vMR};
 function render(v){
   current=v;
   if(location.hash!=='#'+v){ try{ history.replaceState(null,'','#'+v); }catch(e){ location.hash=v; } }
@@ -123,6 +125,8 @@ function render(v){
   if(v==='cal') loadCal();
   if(v==='po') loadPO();
   if(v==='pay') loadPay();
+  if(v==='venmo') wireVenmo();
+  if(v==='mr') wireMR();
 }
 function renderMnav(){
   var html='';
@@ -2294,3 +2298,239 @@ function calClick(e){
 }
 /* =================== END CTK — CALIBRATED TOOL KIT =================== */
 
+
+/* ================= VENMO FEE CALCULATOR ================= */
+var VM_FEES={
+  standard:{pct:0.019, flat:0.10, name:'Standard',   sub:'1.9% + $0.10',  label:'Venmo fee (1.9% + $0.10)'},
+  tap:     {pct:0.0229,flat:0.09, name:'Tap to Pay', sub:'2.29% + $0.09', label:'Venmo fee (2.29% + $0.09)'}
+};
+var VM_ORDER=['standard','tap'];
+var VM_TYPE='standard';
+
+function vmSolve(invoice,f){
+  var invC=Math.round(invoice*100), flatC=Math.round(f.flat*100);
+  function feeCents(c){ return Math.round(c*f.pct)+flatC; }
+  var c=Math.max(Math.floor((invC+flatC)/(1-f.pct))-3,1);
+  for(var i=0;i<500;i++,c++){ if(c-feeCents(c)>=invC) break; }
+  return {charge:c/100, fee:feeCents(c)/100, net:(c-feeCents(c))/100};
+}
+
+function vVenmo(){
+  var h='';
+  for(var i=0;i<VM_ORDER.length;i++){ var k=VM_ORDER[i], f=VM_FEES[k];
+    h+='<button class="vm-btn'+(k===VM_TYPE?' active':'')+'" data-type="'+k+'">'+esc(f.name)+'<small>'+esc(f.sub)+'</small></button>'; }
+  return topbar('Venmo Fee Calculator','Gross up an invoice so the processing fee lands on the customer, not on you','calculator · no sheet data')
+  +'<div class="grid g2" style="align-items:start">'
+    +'<div class="card pad">'
+      +'<label for="vm-inv">Invoice total (what you want to receive)</label>'
+      +'<div class="vm-wrap"><span class="vm-dollar">$</span><input type="text" id="vm-inv" inputmode="decimal" placeholder="0.00" autocomplete="off"></div>'
+      +'<div class="vm-btns">'+h+'</div>'
+      +'<div id="vm-out"></div>'
+      +'<p class="hint" style="margin-top:14px">Add the fee to the invoice as a non-taxable line item — invoice + fee equals the charge exactly.</p>'
+    +'</div>'
+    +'<div class="card pad">'
+      +'<div class="section-title" style="margin:0 0 14px">Both methods, side by side</div>'
+      +'<div id="vm-cmp"><div class="hint">Enter an invoice total to compare.</div></div>'
+    +'</div>'
+  +'</div>';
+}
+
+function vmPaint(){
+  var inp=$('#vm-inv'); if(!inp) return;
+  var out=$('#vm-out'), cmp=$('#vm-cmp'); if(!out||!cmp) return;
+  var invoice=parseFloat(inp.value.replace(/[^0-9.]/g,''));
+  if(isNaN(invoice)||invoice<=0){
+    out.innerHTML='';
+    cmp.innerHTML='<div class="hint">Enter an invoice total to compare.</div>';
+    return;
+  }
+  var f=VM_FEES[VM_TYPE], r=vmSolve(invoice,f);
+  out.innerHTML='<div class="vm-out">'
+    +'<div class="vm-lab">Charge the customer</div>'
+    +'<div class="vm-big">'+money(r.charge)+'</div>'
+    +'<div class="vm-ln"><span>Your invoice</span><span>'+money(invoice)+'</span></div>'
+    +'<div class="vm-ln"><span>'+esc(f.label)+'</span><span>'+money(r.fee)+'</span></div>'
+    +'<div class="vm-ln net"><span>You receive</span><span>'+money(r.net)+'</span></div>'
+    +'</div>'
+    +'<button class="btn vm-copy" id="vm-copy" data-amt="'+r.charge.toFixed(2)+'">Copy amount</button>';
+  var cb=$('#vm-copy');
+  cb.onclick=function(){
+    var amt=cb.getAttribute('data-amt');
+    function done(){ cb.textContent='Copied $'+amt; setTimeout(function(){ cb.textContent='Copy amount'; },1400); }
+    function fail(){ cb.textContent='Amount: $'+amt; }
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(amt).then(done,fail); }
+    else { fail(); }
+  };
+  var rows='';
+  for(var i=0;i<VM_ORDER.length;i++){ var k=VM_ORDER[i], rr=vmSolve(invoice,VM_FEES[k]);
+    rows+='<tr'+(k===VM_TYPE?' class="vm-on"':'')+'><td>'+esc(VM_FEES[k].name)+'</td><td class="num">'+money(rr.charge)+'</td><td class="num">'+money(rr.fee)+'</td></tr>'; }
+  cmp.innerHTML='<table class="tb"><thead><tr><th>Method</th><th class="num">Charge</th><th class="num">Fee</th></tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<p class="hint" style="margin-top:12px">Solved in whole cents — the smallest charge whose net lands exactly on your invoice.</p>';
+}
+
+function wireVenmo(){
+  var inp=$('#vm-inv'); if(!inp) return;
+  var btns=document.querySelectorAll('.vm-btn');
+  for(var i=0;i<btns.length;i++){
+    btns[i].onclick=function(){
+      VM_TYPE=this.getAttribute('data-type');
+      for(var j=0;j<btns.length;j++) btns[j].classList.toggle('active', btns[j].getAttribute('data-type')===VM_TYPE);
+      vmPaint();
+    };
+  }
+  inp.oninput=vmPaint;
+  vmPaint();
+  inp.focus();
+}
+
+
+/* ================= MISSING RECEIPT AFFIDAVIT ================= */
+var MR_PAY=['Business Debit Card','Business Credit Card','Check','Cash','Other'];
+var MR_CAT=['Shop Supplies','Parts (COGS)','Tools / Equipment','Fuel / Vehicle','Other'];
+var MR_WHY=['Receipt lost or misplaced','Receipt never provided by vendor','Receipt damaged / illegible','Electronic receipt not received / deleted','Other'];
+var MR_DOCS=['Bank statement','Credit card statement','Vendor account history / reprinted invoice','Email confirmation','Purchase order record','None available'];
+var MR_CERT='I certify that the above expense was incurred for legitimate business purposes of C&J Aviation LLC, that the original receipt is unavailable for the reason stated above, and that the information provided is true and accurate to the best of my knowledge.';
+
+function mrCatList(){
+  var seen={}, out=[], A=(DATA&&DATA.accounts)||[];
+  for(var i=0;i<A.length;i++){ var n=A[i].name;
+    if(!n||A[i].isMoney||A[i].archived||n==='REVIEW'||n==='UNCATEGORIZED'||seen[n]) continue;
+    seen[n]=1; out.push(n); }
+  for(var j=0;j<MR_CAT.length;j++) if(!seen[MR_CAT[j]]){ seen[MR_CAT[j]]=1; out.push(MR_CAT[j]); }
+  var h='<datalist id="mr-cat-list">';
+  for(var k=0;k<out.length;k++) h+='<option value="'+esc(out[k])+'"></option>';
+  return h+'</datalist>';
+}
+function mrOpts(arr){ var h='<option value=""></option>'; for(var i=0;i<arr.length;i++) h+='<option>'+esc(arr[i])+'</option>'; return h; }
+function mrRecall(k){ try{ return localStorage.getItem(k)||''; }catch(e){ return ''; } }
+function mrVal(id){ var e=$(id); return e?String(e.value==null?'':e.value).trim():''; }
+function mrDate(iso){ if(!iso) return ''; var p=String(iso).split('-'); if(p.length!==3) return iso; return p[1]+'/'+p[2]+'/'+p[0]; }
+
+function vMR(){
+  var today=new Date().toISOString().slice(0,10);
+  var docs='';
+  for(var i=0;i<MR_DOCS.length;i++) docs+='<label class="mr-chk"><input type="checkbox" class="mr-doc" value="'+esc(MR_DOCS[i])+'"><span>'+esc(MR_DOCS[i])+'</span></label>';
+  return topbar('Missing Receipt Affidavit','Documents an expense when the original receipt is lost, never issued, or unreadable','affidavit · print or save as PDF')
+  +'<div id="mr-flash"></div>'
+  +'<div id="mr-form">'
+  +'<div class="card pad">'
+    +'<div class="section-title" style="margin:0 0 14px">Expense information</div>'
+    +'<div class="form-row"><div><label for="mr-date">Date of expense</label><input type="date" id="mr-date"></div>'
+      +'<div><label for="mr-vendor">Vendor / payee</label><input type="text" id="mr-vendor" placeholder="Aircraft Spruce"></div></div>'
+    +'<div class="form-row"><div><label for="mr-amt">Amount</label><input type="text" id="mr-amt" inputmode="decimal" placeholder="0.00"></div>'
+      +'<div><label for="mr-job">Related job / aircraft</label><input type="text" id="mr-job" placeholder="N3115W"></div></div>'
+    +'<div class="form-row"><div><label for="mr-pay">Payment method</label><select id="mr-pay">'+mrOpts(MR_PAY)+'</select></div>'
+      +'<div><label for="mr-cat">Expense category</label><input type="text" id="mr-cat" list="mr-cat-list" autocomplete="off">'+mrCatList()+'</div></div>'
+  +'</div>'
+  +'<div class="grid g2" style="margin-top:16px">'
+    +'<div class="card pad">'
+      +'<div class="section-title" style="margin:0 0 14px">Reason the receipt is missing</div>'
+      +'<label for="mr-why">Reason</label><select id="mr-why">'+mrOpts(MR_WHY)+'</select>'
+      +'<div style="margin-top:14px" id="mr-other-wrap" hidden><label for="mr-other">Details (if Other)</label><input type="text" id="mr-other"></div>'
+      +'<div style="margin-top:14px"><label for="mr-desc">Description &amp; business purpose</label>'
+      +'<textarea id="mr-desc" rows="4" placeholder="What was purchased and how it relates to the business"></textarea></div>'
+    +'</div>'
+    +'<div class="card pad">'
+      +'<div class="section-title" style="margin:0 0 14px">Supporting documentation attached</div>'
+      +'<div class="mr-chks">'+docs+'</div>'
+      +'<p class="hint" style="margin-top:12px">Tick whatever you can produce instead of the receipt. Keep it with this affidavit.</p>'
+    +'</div>'
+  +'</div>'
+  +'<div class="card pad" style="margin-top:16px">'
+    +'<div class="section-title" style="margin:0 0 14px">Certification</div>'
+    +'<p class="mr-cert">'+esc(MR_CERT)+'</p>'
+    +'<div class="form-row"><div><label for="mr-by">Signed by (printed name)</label><input type="text" id="mr-by" value="'+esc(mrRecall('cj_mr_by'))+'"></div>'
+      +'<div><label for="mr-title">Title / member</label><input type="text" id="mr-title" value="'+esc(mrRecall('cj_mr_title'))+'"></div></div>'
+    +'<div class="form-row"><div><label for="mr-signed">Date signed</label><input type="date" id="mr-signed" value="'+today+'"></div>'
+      +'<div><label for="mr-rev">Reviewed by (2nd member, optional)</label><input type="text" id="mr-rev"></div></div>'
+    +'<div class="mr-actions">'
+      +'<button class="btn" id="mr-pdf">🖨 Download PDF</button>'
+      +'<button class="btn ghost" id="mr-clear">Clear form</button>'
+    +'</div>'
+  +'</div>'
+  +'</div>'
+  +'<div id="mr-doc"></div>';
+}
+
+function mrBuildDoc(){
+  var box=$('#mr-doc'); if(!box) return;
+  var checked={}, boxes=document.querySelectorAll('.mr-doc');
+  for(var i=0;i<boxes.length;i++) if(boxes[i].checked) checked[boxes[i].value]=1;
+  var amt=parseFloat(mrVal('#mr-amt').replace(/[^0-9.]/g,''));
+  function r(label,val,cls){ return '<tr><td class="mrl">'+esc(label)+'</td><td class="mrv'+(cls?' '+cls:'')+'">'+esc(val||'')+'</td></tr>'; }
+  var docs='';
+  for(var k=0;k<MR_DOCS.length;k++)
+    docs+='<tr><td class="mrc">'+(checked[MR_DOCS[k]]?'☑':'☐')+'</td><td class="mrd">'+esc(MR_DOCS[k])+'</td></tr>';
+  box.innerHTML=
+    '<div class="mr-page">'
+   +'<div class="mr-head"><div class="mr-co">C&amp;J Aviation LLC</div>'
+   +'<div class="mr-ti">MISSING RECEIPT AFFIDAVIT</div>'
+   +'<div class="mr-note">Use when an original receipt is lost, missing, or never provided. Attach supporting documentation.</div></div>'
+   +'<div class="mr-bar">EXPENSE INFORMATION</div>'
+   +'<table class="mr-tb"><tbody>'
+   + r('Date of Expense', mrDate(mrVal('#mr-date')),'num')
+   + r('Vendor / Payee', mrVal('#mr-vendor'))
+   + r('Amount ($)', isNaN(amt)?'':money(amt),'num')
+   + r('Payment Method', mrVal('#mr-pay'))
+   + r('Expense Category', mrVal('#mr-cat'))
+   + r('Related Job / Aircraft', mrVal('#mr-job'))
+   +'</tbody></table>'
+   +'<div class="mr-bar">DESCRIPTION &amp; BUSINESS PURPOSE</div>'
+   +'<div class="mr-sub">What was purchased and how it relates to business:</div>'
+   +'<div class="mr-box">'+esc(mrVal('#mr-desc'))+'</div>'
+   +'<div class="mr-bar">REASON RECEIPT IS MISSING</div>'
+   +'<table class="mr-tb"><tbody>'
+   + r('Reason', mrVal('#mr-why'))
+   + r('Details (if Other)', mrVal('#mr-other'),'tall')
+   +'</tbody></table>'
+   +'<div class="mr-bar">SUPPORTING DOCUMENTATION ATTACHED</div>'
+   +'<table class="mr-tb mr-dt"><tbody>'+docs+'</tbody></table>'
+   +'<div class="mr-bar">CERTIFICATION</div>'
+   +'<div class="mr-cert2">'+esc(MR_CERT)+'</div>'
+   +'<table class="mr-tb"><tbody>'
+   + r('Signed By (Printed Name)', mrVal('#mr-by'))
+   + r('Title / Member', mrVal('#mr-title'))
+   + r('Date Signed', mrDate(mrVal('#mr-signed')),'num')
+   + r('Reviewed By (2nd Member, opt.)', mrVal('#mr-rev'))
+   +'</tbody></table>'
+   +'</div>';
+}
+
+function mrFlash(cls,msg){
+  var f=$('#mr-flash'); if(!f) return;
+  f.innerHTML=msg?'<div class="flash '+cls+'">'+esc(msg)+'</div>':'';
+}
+
+function wireMR(){
+  var why=$('#mr-why'); if(!why) return;
+  why.onchange=function(){ var w=$('#mr-other-wrap'); if(w) w.hidden=(why.value!=='Other'); mrFlash('',''); };
+  var ids=['#mr-date','#mr-vendor','#mr-amt','#mr-by'];
+  for(var i=0;i<ids.length;i++){ var e=$(ids[i]); if(e) e.oninput=function(){ mrFlash('',''); }; }
+  var cl=$('#mr-clear');
+  if(cl) cl.onclick=function(){
+    var all=['#mr-date','#mr-vendor','#mr-amt','#mr-job','#mr-pay','#mr-cat','#mr-why','#mr-desc','#mr-other','#mr-rev'];
+    for(var j=0;j<all.length;j++){ var el=$(all[j]); if(el) el.value=''; }
+    var boxes=document.querySelectorAll('.mr-doc');
+    for(var b=0;b<boxes.length;b++) boxes[b].checked=false;
+    var w=$('#mr-other-wrap'); if(w) w.hidden=true;
+    var d=$('#mr-doc'); if(d) d.innerHTML='';
+    mrFlash('ok','Form cleared and ready for the next one.');
+    setTimeout(function(){ mrFlash('',''); },1800);
+  };
+  var pd=$('#mr-pdf');
+  if(pd) pd.onclick=function(){
+    var miss=[];
+    if(!mrVal('#mr-date')) miss.push('date of expense');
+    if(!mrVal('#mr-vendor')) miss.push('vendor');
+    if(!mrVal('#mr-amt')) miss.push('amount');
+    if(!mrVal('#mr-why')) miss.push('reason');
+    if(!mrVal('#mr-by')) miss.push('signed by');
+    if(miss.length){ mrFlash('err','Fill in '+miss.join(', ')+' before saving the PDF.'); return; }
+    mrFlash('','');
+    try{ localStorage.setItem('cj_mr_by',mrVal('#mr-by')); localStorage.setItem('cj_mr_title',mrVal('#mr-title')); }catch(e){}
+    mrBuildDoc();
+    window.print();
+  };
+  window.onbeforeprint=function(){ if(current==='mr'){ mrBuildDoc(); document.body.classList.add('mr-only'); } };
+  window.onafterprint=function(){ document.body.classList.remove('mr-only'); };
+}
