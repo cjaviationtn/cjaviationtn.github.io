@@ -648,7 +648,7 @@ function glSave(rowNum, btn){
   };
   btn.disabled=true; btn.textContent='Saving\u2026';
   google.script.run
-    .withSuccessHandler(function(d){ LEDGER_CACHE=d; GL_EDIT_ROW=null; if(current==='ledger') render('ledger'); glRefreshReports(); })
+    .withSuccessHandler(function(d){ LEDGER_CACHE=d; GL_EDIT_ROW=null; if(current==='ledger') glRepaintKeepScroll(); glRefreshReports(); })
     .withFailureHandler(function(e){ btn.disabled=false; btn.textContent='Save'; alert('Could not save: '+(e.message||e)); })
     .updateLedgerRow(rowNum, payload);
 }
@@ -665,7 +665,7 @@ function glDelete(rowNum){
   }
   if(!confirm('Delete this entire transaction?\n\n'+mates.length+' row'+(mates.length>1?'s':'')+' will be permanently removed:\n'+lines+'\n\nThis cannot be undone.')) return;
   google.script.run
-    .withSuccessHandler(function(d){ LEDGER_CACHE=d; GL_EDIT_ROW=null; if(current==='ledger') render('ledger'); glRefreshReports(); })
+    .withSuccessHandler(function(d){ LEDGER_CACHE=d; GL_EDIT_ROW=null; if(current==='ledger') glRepaintKeepScroll(); glRefreshReports(); })
     .withFailureHandler(function(e){ alert('Could not delete: '+(e.message||e)); })
     .deleteTransactionAndReload(txn);
 }
@@ -687,6 +687,14 @@ function vLedger(){
   if(!LEDGER_CACHE) return top+'<div id="gl-banner"></div><div class="card"><div class="miniload"><div class="spin"></div>Loading the full ledger…</div></div>';
   return top+'<div id="gl-banner">'+bannerHtml()+'</div>'
     +'<div class="ledger-box"><table class="tb" style="font-size:12px"><thead id="gl-head">'+glHeadRow()+'</thead><tbody id="gl-body">'+glBody()+'</tbody></table></div>';
+}
+/* Repaint the ledger in place and put the scroll back where it was, so saving a
+   row or fixing a REVIEW account doesn't throw the user back to the top. */
+function glRepaintKeepScroll(){
+  var box=document.querySelector('.ledger-box'), boxTop=box?box.scrollTop:0, boxLeft=box?box.scrollLeft:0, winY=window.pageYOffset||0;
+  repaintLedger();
+  box=document.querySelector('.ledger-box'); if(box){ box.scrollTop=boxTop; box.scrollLeft=boxLeft; }
+  window.scrollTo(0, winY);
 }
 function repaintLedger(){
   var head=document.getElementById('gl-head'), body=document.getElementById('gl-body');
@@ -730,7 +738,7 @@ function setLedgerAccount(rowNum, acct, selEl){
   google.script.run
     .withSuccessHandler(function(res){
       for(var i=0;i<LEDGER_CACHE.length;i++){ if(LEDGER_CACHE[i].rowNum===res.rowNum){ LEDGER_CACHE[i].account=res.account; LEDGER_CACHE[i].entryCheck=res.entryCheck; break; } }
-      if(wasReview && current==='ledger'){ render('ledger'); return; }
+      if(wasReview && current==='ledger'){ glRepaintKeepScroll(); return; }
       selEl.disabled=false; selEl.style.opacity='1';
       var tr=selEl.closest && selEl.closest('tr'); if(tr){ tr.style.transition='background .3s'; tr.style.background='#dff0e4'; setTimeout(function(){ tr.style.background=''; },600); }
     })
