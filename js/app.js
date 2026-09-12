@@ -591,7 +591,7 @@ function glHeadRow(){
     var arrow=sorted?(GL_SORT.dir>0?' ▲':' ▼'):'';
     h+='<th class="'+(d.num?'num ':'')+(filt?'filtered':'')+'">'+esc(d.label)+arrow+'<button class="fbtn'+((sorted||filt)?' active':'')+'" data-key="'+d.key+'">▾</button></th>';
   }
-  return h+'<th style="width:104px">Actions</th></tr>';
+  return h+'<th class="gl-act" style="width:104px">Actions</th></tr>';
 }
 function glBody(){
   var rows=ledgerRows(); if(!rows.length) return '<tr><td colspan="12" style="text-align:center;padding:20px;color:var(--muted)">No rows match the current filters. <a href="#" id="gl-clearall">Clear all filters</a></td></tr>';
@@ -600,7 +600,7 @@ function glBody(){
     if(GL_EDIT_ROW===x.rowNum){ rh+=glEditRow(x); continue; }
     rh+='<tr'+(isReview(x)?' class="rev-row"':'')+'>';
     for(var c=0;c<GL_DEF.length;c++){ var k=GL_DEF[c].key; rh+='<td'+(GL_DEF[c].num?' class="num"':'')+'>'+cellHtml(x,k)+'</td>'; }
-    rh+='<td style="white-space:nowrap"><button class="btn ghost" style="padding:3px 8px;font-size:11px" data-gledit="'+x.rowNum+'">Edit</button> <button class="btn ghost" style="padding:3px 8px;font-size:11px" data-gldel="'+x.rowNum+'" title="Delete this transaction">\u2715</button></td>';
+    rh+='<td class="gl-act" style="white-space:nowrap"><button class="btn ghost" style="padding:3px 8px;font-size:11px" data-gledit="'+x.rowNum+'">Edit</button> <button class="btn ghost" style="padding:3px 8px;font-size:11px" data-gldel="'+x.rowNum+'" title="Delete this transaction">\u2715</button></td>';
     rh+='</tr>';
   }
   return rh;
