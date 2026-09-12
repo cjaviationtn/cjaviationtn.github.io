@@ -17,7 +17,9 @@
   .logo-badge{background:url('../img/logo.png') center/contain no-repeat;flex-shrink:0}
   .side{width:250px;background:var(--navy);color:#dfe7ef;flex-shrink:0;
     position:sticky;top:0;height:100vh;display:flex;flex-direction:column;overflow-y:auto;
-    transition:width .18s ease}
+    transition:width .18s ease;
+    /* iOS home-screen mode draws under the status bar and home indicator (viewport-fit=cover) */
+    padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
   .brand{display:flex;align-items:center;gap:12px;padding:18px 16px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
   .brand .logo-badge{width:50px;height:50px}
   .brand h1{font-size:16px;margin:0;line-height:1.05;color:#fff;font-weight:800;letter-spacing:.02em}
@@ -44,7 +46,7 @@
   .app.narrow .nav .ico{width:auto;font-size:17px}
   .app.narrow .side .foot{display:none}
   .app.narrow .side-toggle .lbl{display:none}
-  .main{flex:1;min-width:0;padding:24px 30px;max-width:1200px}
+  .main{flex:1;min-width:0;padding:24px 30px;max-width:1200px;padding-top:calc(24px + env(safe-area-inset-top,0px))}
   .main.wide{max-width:none}
   .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px}
   .topbar h2{margin:0;font-size:22px;color:var(--navy-d)}
@@ -165,7 +167,7 @@
   @keyframes sp{to{transform:rotate(360deg)}}
 
   @media(max-width:900px){
-    .side{display:none} .main,.main.wide{padding:18px;width:100%;max-width:100%}
+    .side{display:none} .main,.main.wide{padding:18px;width:100%;max-width:100%;padding-top:calc(18px + env(safe-area-inset-top,0px))}
     .g4,.g3,.g2{grid-template-columns:1fr 1fr} .form-row{grid-template-columns:1fr}
     .mobile-nav{display:flex !important}
 
