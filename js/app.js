@@ -3,6 +3,7 @@
 var DATA=null, current='dashboard';
 var COA_CACHE=null, COA_EDIT_ROW=null, COA_MSG=null, COA_SHOW_ARCH=false, COA_PANEL=null;
 var LEDGER_CACHE=null, VR_CACHE=null, LOGO_URI='';
+var VIEW_HIST=[], RENDER_BACK=false;
 
 
 function $(s){return document.querySelector(s);}
@@ -12,6 +13,37 @@ function findVal(arr,label){ for(var i=0;i<arr.length;i++){ if(arr[i].label.repl
 function startsAny(s,arr){ s=s.replace(/\s+/g,' ').trim(); for(var i=0;i<arr.length;i++) if(s.indexOf(arr[i])===0) return true; return false; }
 
 
+function isStandalone(){ try{ return (window.navigator.standalone===true) || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); }catch(e){ return false; } }
+function pwaBarHtml(){
+  return '<div class="pwabar" id="pwabar">'
+    +'<button class="pwabtn" id="pwa-back" aria-label="Back" title="Back">\u2039</button>'
+    +'<div class="pwabar-label" id="pwa-label"></div>'
+    +'<button class="pwabtn" id="pwa-reload" aria-label="Reload" title="Reload">\u21bb</button>'
+    +'<button class="pwabtn" id="pwa-share" aria-label="Share" title="Share">'
+    +'<svg viewBox="0 0 16 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1v11M4.5 4.5L8 1l3.5 3.5"/><path d="M3 8H2v9h12V8h-1"/></svg>'
+    +'</button></div>';
+}
+function wirePwaBar(){
+  var b=document.getElementById('pwa-back'); if(b) b.onclick=viewBack;
+  var r=document.getElementById('pwa-reload'); if(r) r.onclick=function(){ location.reload(); };
+  var sh=document.getElementById('pwa-share'); if(sh) sh.onclick=shareApp;
+  updateBar();
+}
+function viewBack(){ if(VIEW_HIST.length){ RENDER_BACK=true; var v=VIEW_HIST.pop(); render(v); RENDER_BACK=false; } }
+function shareApp(){
+  var url=location.href, title='C&J Aviation \u2014 '+(VIEW_TITLE[current]||'Admin');
+  if(navigator.share){ navigator.share({title:title, url:url}).catch(function(){}); return; }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(function(){
+      var lbl=document.getElementById('pwa-label'); if(lbl){ lbl.textContent='Link copied'; setTimeout(updateBar,1400); }
+    }, function(){});
+  }
+}
+function updateBar(){
+  var lbl=document.getElementById('pwa-label');
+  if(lbl) lbl.textContent=(VIEW_TITLE[current]||'')+' \u00b7 '+(CJ_CONFIG.siteVersion||'');
+  var bk=document.getElementById('pwa-back'); if(bk) bk.disabled=!VIEW_HIST.length;
+}
 function boot(){
   $('#root').innerHTML='<div class="loading"><div><div class="spin"></div>Loading your books…</div></div>';
   google.script.run
@@ -84,13 +116,13 @@ function buildShell(){
   var navHtml='';
   for(var i=0;i<NAV.length;i++) navHtml+='<button data-view="'+NAV[i][0]+'" title="'+esc(NAV[i][2])+'"><span class="ico">'+NAV[i][1]+'</span> <span class="lbl">'+NAV[i][2]+'</span></button>';
   $('#root').innerHTML =
-    '<div class="app"><aside class="side">'
+    '<div class="app'+(isStandalone()?' standalone':'')+'"><aside class="side">'
     +'<button class="side-toggle" id="side-toggle"></button>'
     +'<div class="brand"><div class="logo-badge"></div><div class="btxt"><h1>C&J AVIATION</h1><span class="tagline">Aircraft Mechanics</span><span class="subtag">Accounting/Admin Page</span></div></div>'
     +'<nav class="nav" id="nav">'+navHtml+'</nav>'
     +'<div class="foot">Reads &amp; writes your Google Sheet live.<br>Loaded '+esc(DATA.generatedAt)+'.'
     +'<div class="who">'+esc((CJ.session()||{}).email||'')+' · <a href="#" id="signout">Sign out</a></div></div>'
-    +'</aside><main class="main"><div class="mobile-nav" id="mnav"></div><div id="content"></div></main></div>';
+    +'</aside><main class="main"><div class="mobile-nav" id="mnav"></div><div id="content"></div></main>'+pwaBarHtml()+'</div>';
   var btns=document.querySelectorAll('#nav button');
   for(var j=0;j<btns.length;j++) btns[j].onclick=function(){ render(this.getAttribute('data-view')); };
 
@@ -100,6 +132,7 @@ function buildShell(){
     try{ localStorage.setItem('cj_side', SIDE_NARROW?'1':'0'); }catch(e){}
     applySide(); };
   applySide();
+  wirePwaBar();
 
   try{ var bg=getComputedStyle(document.querySelector('.brand .logo-badge')).backgroundImage;
        var mm=bg.match(/url\((['"]?)(.*?)\1\)/); if(mm) LOGO_URI=mm[2]; }catch(e){}
@@ -108,6 +141,7 @@ function buildShell(){
 
 var VIEWS={dashboard:vDashboard,entry:vEntry,ledger:vLedger,tbx:vTBX,pl:vPL,bs:vBS,equity:vEquity,coa:vCOA,vendors:vVendors,po:vPO,pay:vPay,cal:vCal,venmo:vVenmo,mr:vMR};
 function render(v){
+  if(current && current!==v && !RENDER_BACK) VIEW_HIST.push(current);
   current=v;
   if(location.hash!=='#'+v){ try{ history.replaceState(null,'','#'+v); }catch(e){ location.hash=v; } }
   var mainEl=document.querySelector('.main');
@@ -127,6 +161,7 @@ function render(v){
   if(v==='pay') loadPay();
   if(v==='venmo') wireVenmo();
   if(v==='mr') wireMR();
+  updateBar();
 }
 function renderMnav(){
   var html='';

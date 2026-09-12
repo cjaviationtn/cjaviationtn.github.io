@@ -204,11 +204,27 @@
   .mobile-nav{display:none;gap:8px;margin-bottom:16px;flex-wrap:wrap}
   .mobile-nav button{background:#fff;border:1px solid var(--line);color:var(--navy);padding:8px 12px;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer}
   .mobile-nav button.active{background:var(--navy);color:#fff}
+  /* home-screen (standalone) bottom toolbar - hidden in a normal browser tab */
+  .pwabar{display:none}
+  .app.standalone .pwabar{display:flex;align-items:center;gap:8px;position:fixed;left:0;right:0;bottom:0;z-index:60;
+    padding:8px 14px calc(8px + env(safe-area-inset-bottom,0px));
+    background:rgba(244,246,248,.94);-webkit-backdrop-filter:saturate(1.6) blur(10px);backdrop-filter:saturate(1.6) blur(10px);
+    border-top:1px solid var(--line)}
+  .pwabar .pwabtn{width:46px;height:38px;flex:none;display:flex;align-items:center;justify-content:center;background:#fff;
+    border:1px solid var(--line);border-radius:10px;color:var(--navy);font-size:20px;font-weight:600;font-family:inherit;
+    cursor:pointer;line-height:1;padding:0}
+  .pwabar .pwabtn:hover{background:var(--cream)}
+  .pwabar .pwabtn:disabled{opacity:.35;cursor:default}
+  .pwabar .pwabtn svg{width:18px;height:20px;display:block}
+  .pwabar-label{flex:1;min-width:0;text-align:center;font-size:13px;font-weight:600;color:var(--muted);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .app.standalone .main{padding-bottom:calc(70px + env(safe-area-inset-bottom,0px))}
+  .app.standalone .side{padding-bottom:calc(62px + env(safe-area-inset-bottom,0px))}
 
 
   @media print{
     @page{margin:12mm}
-    .side,.mobile-nav,.print-controls,.pill,.btn,.actions,.hint,.fbtn,.fpop,.rev-banner{display:none !important}
+    .side,.mobile-nav,.print-controls,.pill,.btn,.actions,.hint,.fbtn,.fpop,.rev-banner,.pwabar{display:none !important}
     .gl-act,.gl-noprint{display:none !important}
     body{background:#fff;color:#000} .main{max-width:none;padding:0} .app{display:block}
     .topbar{margin-bottom:8px} .topbar h2{color:#000;font-size:16px} .topbar .sub{font-size:11px}
