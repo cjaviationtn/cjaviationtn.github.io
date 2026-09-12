@@ -52,6 +52,8 @@
   .topbar h2{margin:0;font-size:22px;color:var(--navy-d)}
   .topbar .sub{color:var(--muted);font-size:13px;margin-top:3px}
   .topbar .sub .lupd{color:var(--navy);font-weight:600}
+  /* right-hand block (pill + print controls): stay right-aligned even when a long subtitle wraps it onto its own line */
+  .topbar > div:last-child{display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-left:auto}
   .pill{background:#fff;border:1px solid var(--line);color:var(--muted);padding:6px 12px;border-radius:999px;font-size:12px}
   .actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
     .pay-actions{gap:8px}
