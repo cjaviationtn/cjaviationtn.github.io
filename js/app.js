@@ -1027,6 +1027,8 @@ function vEntry(){
     +'<div class="form-row"><div><label>Date</label><input type="date" id="f-date" value="'+today+'"></div><div><label>Amount (USD)</label><input type="number" id="f-amt" placeholder="0.00" step="0.01" min="0"></div></div>'
     +'<div style="margin-bottom:16px"><label>Type</label><select id="f-type"><option value="out">Expense — money out</option><option value="in">Income — money in</option><option value="transfer">Transfer — between your accounts</option></select></div>'
     +'<div style="margin-bottom:16px"><label>Description</label><input id="f-desc" placeholder="e.g. Aircraft Spruce — brake parts"></div>'
+    +'<div class="form-row"><div><label>Reference #</label><input id="f-ref" placeholder="Invoice, PO, Venmo txn ID…"><div class="hint">Optional · ledger column D</div></div>'
+    +'<div><label>Notes / Tail #</label><input id="f-notes" placeholder="e.g. N3115W / Invoice 1033"><div class="hint">Optional · ledger column G</div></div></div>'
     +'<div class="form-row"><div><label id="lab-a">Money account</label><select id="f-a"></select><div class="hint" id="hint-a">What the money moved through</div></div>'
     +'<div><label id="lab-b">Category account</label><select id="f-b"></select><div class="hint" id="hint-b">From your Chart of Accounts</div></div></div>'
   +'</div>'
@@ -1038,7 +1040,7 @@ function vEntry(){
   +'</div></div>';
 }
 function wireEntry(){
-  var amt=$('#f-amt'),type=$('#f-type'),selA=$('#f-a'),selB=$('#f-b'),desc=$('#f-desc'),date=$('#f-date'),
+  var amt=$('#f-amt'),type=$('#f-type'),selA=$('#f-a'),selB=$('#f-b'),desc=$('#f-desc'),ref=$('#f-ref'),notes=$('#f-notes'),date=$('#f-date'),
       prev=$('#preview'),chk=$('#balchk'),post=$('#postbtn'),labA=$('#lab-a'),labB=$('#lab-b'),hintA=$('#hint-a'),hintB=$('#hint-b'),note=$('#post-note');
   function populate(){
     var t=type.value; selA.innerHTML=moneyOptions();
@@ -1064,8 +1066,8 @@ function wireEntry(){
     if(t==='transfer' && selA.value===selB.value) return;
     post.disabled=true; post.textContent='Posting…';
     var payload = (t==='transfer')
-      ? { date:date.value, amount:a, desc:desc.value, direction:'transfer', fromAccount:{code:selCode(selA),name:selA.value}, toAccount:{code:selCode(selB),name:selB.value} }
-      : { date:date.value, amount:a, desc:desc.value, direction:t, moneyAccount:{code:selCode(selA),name:selA.value}, categoryAccount:{name:selB.value} };
+      ? { date:date.value, amount:a, desc:desc.value, ref:ref.value, notes:notes.value, direction:'transfer', fromAccount:{code:selCode(selA),name:selA.value}, toAccount:{code:selCode(selB),name:selB.value} }
+      : { date:date.value, amount:a, desc:desc.value, ref:ref.value, notes:notes.value, direction:t, moneyAccount:{code:selCode(selA),name:selA.value}, categoryAccount:{name:selB.value} };
     google.script.run
       .withSuccessHandler(function(res){ LEDGER_CACHE=null; render('entry');
         $('#flash').innerHTML='<div class="flash ok">✓ Posted '+esc(res.txnId)+' — balanced pair written to the ledger ('+money(a)+'). Open the General Ledger tab to see it.</div>'; })
