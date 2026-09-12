@@ -207,7 +207,7 @@
   @media print{
     @page{margin:12mm}
     .side,.mobile-nav,.print-controls,.pill,.btn,.actions,.hint,.fbtn,.fpop,.rev-banner{display:none !important}
-    .gl-act{display:none !important}
+    .gl-act,.gl-noprint{display:none !important}
     body{background:#fff;color:#000} .main{max-width:none;padding:0} .app{display:block}
     .topbar{margin-bottom:8px} .topbar h2{color:#000;font-size:16px} .topbar .sub{font-size:11px}
 

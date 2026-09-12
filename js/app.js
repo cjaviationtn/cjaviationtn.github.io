@@ -589,7 +589,7 @@ function glHeadRow(){
   var h='<tr>';
   for(var i=0;i<GL_DEF.length;i++){ var d=GL_DEF[i]; var sorted=GL_SORT.key===d.key; var filt=!!GL_FILTERS[d.key];
     var arrow=sorted?(GL_SORT.dir>0?' ▲':' ▼'):'';
-    h+='<th class="'+(d.num?'num ':'')+(filt?'filtered':'')+'">'+esc(d.label)+arrow+'<button class="fbtn'+((sorted||filt)?' active':'')+'" data-key="'+d.key+'">▾</button></th>';
+    h+='<th class="'+(d.num?'num ':'')+(filt?'filtered ':'')+(d.key==='entryCheck'?'gl-noprint':'')+'">'+esc(d.label)+arrow+'<button class="fbtn'+((sorted||filt)?' active':'')+'" data-key="'+d.key+'">▾</button></th>';
   }
   return h+'<th class="gl-act" style="width:104px">Actions</th></tr>';
 }
@@ -599,7 +599,7 @@ function glBody(){
   for(var r=0;r<rows.length;r++){ var x=rows[r];
     if(GL_EDIT_ROW===x.rowNum){ rh+=glEditRow(x); continue; }
     rh+='<tr'+(isReview(x)?' class="rev-row"':'')+'>';
-    for(var c=0;c<GL_DEF.length;c++){ var k=GL_DEF[c].key; rh+='<td'+(GL_DEF[c].num?' class="num"':'')+'>'+cellHtml(x,k)+'</td>'; }
+    for(var c=0;c<GL_DEF.length;c++){ var k=GL_DEF[c].key; rh+='<td'+(GL_DEF[c].num?' class="num"':(k==='entryCheck'?' class="gl-noprint"':''))+'>'+cellHtml(x,k)+'</td>'; }
     rh+='<td class="gl-act" style="white-space:nowrap"><button class="btn ghost" style="padding:3px 8px;font-size:11px" data-gledit="'+x.rowNum+'">Edit</button> <button class="btn ghost" style="padding:3px 8px;font-size:11px" data-gldel="'+x.rowNum+'" title="Delete this transaction">\u2715</button></td>';
     rh+='</tr>';
   }
