@@ -563,8 +563,13 @@ function accountCell(r){
   return '<select class="acct-sel'+(rev?' rev-sel':'')+'" data-row="'+r.rowNum+'">'+opts+'</select>';
 }
 function reviewCount(){ var c=0; for(var i=0;i<LEDGER_CACHE.length;i++) if(isReview(LEDGER_CACHE[i])) c++; return c; }
+function statusCell(r){
+  if(r.lineType!=='Category') return esc(r.status==null?'':r.status);
+  return '<select class="stat-sel" data-row="'+r.rowNum+'" style="width:110px;padding:4px 6px;font-size:12px" title="Status applies to every row of this transaction">'+glOptsWith(GL_STATUSES,String(r.status==null?'':r.status))+'</select>';
+}
 function cellHtml(r,k){ var d=glDef(k);
   if(k==='account') return accountCell(r);
+  if(k==='status') return statusCell(r);
   if(d&&d.num) return r[k]!=null?money(r[k]):'';
   if(k==='date') return '<span style="white-space:nowrap">'+esc(r.date)+'</span>';
   return esc(r[k]);
@@ -696,6 +701,8 @@ function wireLedger(){
   var ca=document.getElementById('gl-clearall'); if(ca) ca.onclick=function(e){ e.preventDefault(); GL_FILTERS={}; repaintLedger(); };
   var rs=document.querySelectorAll('#gl-body .acct-sel');
   for(var i=0;i<rs.length;i++) rs[i].onchange=function(){ var row=parseInt(this.getAttribute('data-row'),10); var acct=this.value; if(!acct) return; setLedgerAccount(row,acct,this); };
+  var ss=document.querySelectorAll('#gl-body .stat-sel');
+  for(var s1=0;s1<ss.length;s1++) ss[s1].onchange=function(){ setLedgerStatus(parseInt(this.getAttribute('data-row'),10), this.value, this); };
   var ro=document.getElementById('rev-only'); if(ro) ro.onclick=function(){ GL_FILTERS={account:{'REVIEW':true}}; repaintLedger(); };
   var ra=document.getElementById('rev-all'); if(ra) ra.onclick=function(){ GL_FILTERS={}; repaintLedger(); };
   var eds=document.querySelectorAll('[data-gledit]');
@@ -704,6 +711,17 @@ function wireLedger(){
   for(var d1=0;d1<dls.length;d1++) dls[d1].onclick=function(){ glDelete(parseInt(this.getAttribute('data-gldel'),10)); };
   var glc=document.querySelector('[data-glcancel]'); if(glc) glc.onclick=function(){ GL_EDIT_ROW=null; repaintLedger(); };
   var gls=document.querySelector('[data-glsave]'); if(gls) gls.onclick=function(){ glSave(parseInt(this.getAttribute('data-glsave'),10), this); };
+}
+function setLedgerStatus(rowNum, status, selEl){
+  selEl.disabled=true; selEl.style.opacity='.6';
+  google.script.run
+    .withSuccessHandler(function(res){
+      var rows=res.rows||[res.rowNum];
+      for(var i=0;i<LEDGER_CACHE.length;i++){ if(rows.indexOf(LEDGER_CACHE[i].rowNum)>=0) LEDGER_CACHE[i].status=res.status; }
+      repaintLedger();
+    })
+    .withFailureHandler(function(e){ selEl.disabled=false; selEl.style.opacity='1'; alert('Could not save status: '+(e.message||e)); })
+    .setLedgerStatus(rowNum, status);
 }
 function setLedgerAccount(rowNum, acct, selEl){
   var wasReview=false;
