@@ -515,7 +515,7 @@ function tbxDefaultMonth(){
   return { month:m, note:'' };
 }
 function tbxTiles(d){
-  return '<div class="grid g3">'
+  return '<div class="grid g3 tbx-tiles">'
     +tile('red','Sales Tax Owed','<span class="neg">'+money(d.tax)+'</span>','owed to the state')
     +tile('navy','Labor Income',money(d.labor),'')
     +tile('','Parts Income',money(d.parts),'')
