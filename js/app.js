@@ -229,7 +229,7 @@ function vDashboard(){
   +tile(ven<0?'red':'navy','Venmo Balance','<span class="'+(ven<0?'neg':'')+'">'+money(ven)+'</span>','')
   +tile('navy','AMEX Balance',(amex>0?'<span class="neg">'+money(amex)+'</span>':money(amex)),(amex<0?'credit':'owed'))
   +'</div>'
-  +'<div class="section-title">Sales tax (TBX invoices)</div><div class="grid g2">'
+  +'<div class="section-title">Sales tax (TBX invoices)</div><div class="grid g2 tile-pair">'
   +tile('red','Sales Tax Payable','<span class="neg">'+money(findVal(BS,'Sales Tax Payable'))+'</span>','running liability to the state')
   +tile('','Owed YTD',money(ST.ytd),'')
   +'</div>'
@@ -1793,7 +1793,7 @@ function payEmpPanel(){
       + '<button class="btn" style="background:var(--bad);padding:4px 9px;font-size:12px" data-pedel="'+esc(r[i].name)+'">Delete</button></td></tr>';
   }
   return '<div class="card pad" style="margin-bottom:18px"><div class="section-title" style="margin-top:0">Manage employees</div>'
-    + '<div class="scroll" ><table class="tb"><thead><tr><th>Name</th><th>Rate $/hr</th><th>Role / Notes</th><th>Last Pay Raise</th><th>Hire Date</th><th>Time clock link</th><th></th></tr></thead><tbody>'+rowsH+'</tbody></table></div>'
+    + '<div class="scroll pe-wrap"><table class="tb pe-tbl"><thead><tr><th>Name</th><th>Rate $/hr</th><th>Role / Notes</th><th>Last Pay Raise</th><th>Hire Date</th><th>Time clock link</th><th></th></tr></thead><tbody>'+rowsH+'</tbody></table></div>'
     + '<div class="form-row" style="margin-top:16px"><div><label>New employee</label><input id="pe-name" placeholder="Full name"></div><div><label>Default rate ($/hr)</label><input id="pe-newrate" type="number" step="0.01" placeholder="e.g. 25"></div></div>'
     + '<div class="form-row"><div><label>Role / Notes</label><input id="pe-newrole" placeholder="e.g. A&amp;P"></div><div><label>Last pay raise</label><input id="pe-newraise" type="date"></div><div><label>Hire date</label><input id="pe-newhire" type="date"></div></div>'
     + '<div style="display:flex;gap:10px"><button class="btn" id="pe-add">Add employee</button><button class="btn ghost" id="pe-close">Close</button></div>'
