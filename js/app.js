@@ -41,7 +41,7 @@ function shareApp(){
 }
 function updateBar(){
   var lbl=document.getElementById('pwa-label');
-  if(lbl) lbl.textContent=(VIEW_TITLE[current]||'')+' \u00b7 '+(CJ_CONFIG.siteVersion||'');
+  if(lbl){ var vt=verStampText(); lbl.textContent=(VIEW_TITLE[current]||'')+' \u00b7 '+vt.site+(vt.api?' \u00b7 '+vt.api:''); }
   var bk=document.getElementById('pwa-back'); if(bk) bk.disabled=!VIEW_HIST.length;
 }
 function boot(){
@@ -121,6 +121,7 @@ function buildShell(){
     +'<div class="brand"><div class="logo-badge"></div><div class="btxt"><h1>C&J AVIATION</h1><span class="tagline">Aircraft Mechanics</span><span class="subtag">Accounting/Admin Page</span></div></div>'
     +'<nav class="nav" id="nav">'+navHtml+'</nav>'
     +'<div class="foot">Reads &amp; writes your Google Sheet live.<br>Loaded '+esc(DATA.generatedAt)+'.'
+    +'<div class="verstamp" id="verstamp"></div>'
     +'<div class="who">'+esc((CJ.session()||{}).email||'')+' · <a href="#" id="signout">Sign out</a></div></div>'
     +'</aside><main class="main"><div class="mobile-nav" id="mnav"></div><div id="content"></div></main>'+pwaBarHtml()+'</div>';
   var btns=document.querySelectorAll('#nav button');
@@ -133,6 +134,7 @@ function buildShell(){
     applySide(); };
   applySide();
   wirePwaBar();
+  paintVerStamp();
 
   try{ var bg=getComputedStyle(document.querySelector('.brand .logo-badge')).backgroundImage;
        var mm=bg.match(/url\((['"]?)(.*?)\1\)/); if(mm) LOGO_URI=mm[2]; }catch(e){}
@@ -1943,34 +1945,47 @@ var jb=$('#pay-job'); if(jb) jb.onclick=function(){ PAY_PANEL=(PAY_PANEL==='job'
 
 startApp();
 
-/* ---- version / staleness ------------------------------------------- */
-/* Stamped in by doGet from SERVER_VERSION at the moment this page was built,
-   so a cached copy keeps the version it shipped with. Never hand-type this. */
-var CLIENT_VERSION = CJ_CONFIG.siteVersion;
-var VER = { running: '', live: '', checked: false };
+/* ---- version stamp / staleness ---------------------------------------- */
+/* One stamp (sidebar footer + home-screen toolbar): "site 1.1.11 · API v12".
+   Two independent checks run on load, whenever the tab comes back to the
+   foreground, and every 10 minutes:
+     site — refetch config.js from the live origin (uncached). If its
+            siteVersion differs from the one this page loaded with, this
+            device is holding an old copy → amber bar with a Reload button.
+     api  — ask the Apps Script for its API_VERSION. If it is lower than
+            CJ_CONFIG.apiVersion the backend has not been redeployed
+            (pencil → New version) → amber bar, no reload (reloading won't help). */
+var VER = { siteLoaded: CJ_CONFIG.siteVersion || '', siteLive: '',
+            apiRunning: null, apiWanted: (typeof CJ_CONFIG.apiVersion === 'number') ? CJ_CONFIG.apiVersion : null };
 
-function verNormalize(r) {
-  if (!r) return { running: '', live: '' };
-  if (typeof r === 'string') return { running: r, live: r };
-  return { running: r.running || '', live: r.live || '' };
-}
+function verSiteNum(s) { return String(s || '').replace(/^site\s*/i, ''); }
 
-/* '' = fine | 'cached' = browser holding an old page
-   'deployment' = this URL points at an older deployment */
+/* '' = fine | 'site' = this device has an old copy of the site
+   'api' = the backend answering is older than this site expects */
 function verProblem() {
-  if (!VER.checked) return '';
-  if (VER.live && VER.running && VER.live !== VER.running) return 'deployment';
+  if (VER.siteLive && VER.siteLive !== VER.siteLoaded) return 'site';
+  if (VER.apiRunning !== null && VER.apiWanted !== null && VER.apiRunning < VER.apiWanted) return 'api';
   return '';
 }
 
-function paintVerChip() {
-  var sub = document.querySelector('.topbar .sub');
-  if (!sub) return;
-  if (sub.getAttribute('data-base') === null) sub.setAttribute('data-base', sub.textContent);
+function verStampText() {
   var p = verProblem();
-  sub.innerHTML = esc(sub.getAttribute('data-base')) +
-    ' <span data-verchip="1" style="color:' + (p ? 'var(--warn)' : 'var(--muted)') +
-    ';font-weight:600">· ' + esc(CLIENT_VERSION || '?') + (VER.running ? ' · API ' + esc(VER.running) : '') + (p ? ' ⚠' : '') + '</span>';
+  var site = 'site ' + verSiteNum(VER.siteLoaded);
+  if (p === 'site') site += ' → ' + verSiteNum(VER.siteLive);
+  var api = (VER.apiRunning !== null) ? 'API v' + VER.apiRunning : '';
+  if (p === 'api') api += ', needs v' + VER.apiWanted;
+  return { site: site, api: api, problem: p };
+}
+
+function paintVerStamp() {
+  var t = verStampText();
+  var el = document.getElementById('verstamp');
+  if (el) {
+    el.className = 'verstamp' + (t.problem ? ' warn' : '');
+    el.innerHTML = '<span class="dot"></span>' + esc(t.site) + (t.api ? ' · ' + esc(t.api) : '');
+  }
+  paintUpdateBar();
+  updateBar();
 }
 
 function paintUpdateBar() {
@@ -1982,29 +1997,30 @@ function paintUpdateBar() {
     bar.id = 'updatebar';
     document.body.insertBefore(bar, document.body.firstChild);
   }
-  bar.setAttribute('style',
-    'position:fixed;top:0;left:0;right:0;z-index:99999;padding:10px 16px;' +
-    'font-size:14px;font-weight:600;background:var(--warn);color:#fff;' +
-    'display:flex;align-items:center;justify-content:space-between;gap:12px');
-  bar.innerHTML =
-    '<span>' + (p === 'cached'
-      ? 'This page is out of date (' + esc(CLIENT_VERSION) + ' → ' + esc(VER.running) + ')'
-      : 'Old deployment link (' + esc(VER.running) + ' → ' + esc(VER.live) + ')') +
-    '</span>' +
-    '<button onclick="hardReload()" style="border:0;border-radius:6px;padding:6px 14px;' +
-    'font-weight:700;cursor:pointer;background:#fff;color:var(--warn)">Reload</button>';
+  bar.innerHTML = (p === 'site'
+      ? '<span>Site updated (' + esc(verSiteNum(VER.siteLoaded)) + ' → ' + esc(verSiteNum(VER.siteLive)) + ')</span>'
+        + '<button onclick="hardReload()">Reload</button>'
+      : '<span>Backend not redeployed (API v' + esc(String(VER.apiRunning)) + ', site needs v' + esc(String(VER.apiWanted)) + ')</span>'
+        + '<button onclick="checkVersion()">Check again</button>');
 }
 
 function checkVersion() {
+  fetch('config.js?_=' + Date.now(), { cache: 'no-store' })
+    .then(function (r) { return r.text(); })
+    .then(function (t) {
+      var m = t.match(/siteVersion\s*:\s*['"]([^'"]+)['"]/);
+      if (m) { VER.siteLive = m[1]; paintVerStamp(); }
+    })
+    .catch(function (e) { console.error('site version check failed', e); });
   if (!CJ.session()) return;
   google.script.run
     .withSuccessHandler(function (r) {
-      VER = verNormalize(r);
-      VER.checked = true;
-      paintVerChip();
-      paintUpdateBar();
+      var n = (r && typeof r === 'object') ? (r.api !== undefined ? r.api : r.running) : r;
+      if (typeof n === 'string') { var mm = n.match(/(\d+)/); n = mm ? parseInt(mm[1], 10) : null; }
+      VER.apiRunning = (typeof n === 'number' && !isNaN(n)) ? n : null;
+      paintVerStamp();
     })
-    .withFailureHandler(function () { /* offline: leave the page alone */ })
+    .withFailureHandler(function (e) { console.error('API version check failed', e); })
     .getVersion();
 }
 
@@ -2012,18 +2028,8 @@ function hardReload() {
   window.location.href = location.pathname + '?v=' + Date.now() + (location.hash || '');
 }
 
-/* Re-check whenever this tab comes back to the foreground. */
-document.addEventListener('visibilitychange', function () {
-  if (!document.hidden) checkVersion();
-});
-
-/* The topbar is rendered by JS, so repaint the chip if it gets replaced. */
-setInterval(function () {
-  var sub = document.querySelector('.topbar .sub');
-  if (sub && !sub.querySelector('[data-verchip]')) paintVerChip();
-}, 1500);
-
-paintVerChip();
+document.addEventListener('visibilitychange', function () { if (!document.hidden) checkVersion(); });
+setInterval(checkVersion, 10 * 60 * 1000);
 checkVersion();
 
 
