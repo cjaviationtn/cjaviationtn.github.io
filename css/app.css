@@ -515,3 +515,25 @@
   .tbx-tiles .tile .val,.tbx-tiles .tile .val.small{font-size:20px;margin-top:3px}
   .tbx-tiles .tile .foot{display:none}
 }
+
+/* ============ Phone (≤620px): Vendor Rules — one card per rule ============ */
+@media (max-width:620px){
+  #vr-search{max-width:none !important}
+  .vr-wrap{background:transparent;border:0;box-shadow:none;overflow:visible}
+  .vr-tbl{display:block}
+  .vr-tbl thead{display:none}
+  .vr-tbl tbody{display:block}
+  .vr-tbl tr{display:flex;flex-wrap:wrap;gap:6px 10px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
+  .vr-tbl td{display:block;padding:0;border:0;background:transparent !important;flex:0 0 100%;font-size:13.5px}
+  .vr-tbl td::before{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-bottom:2px}
+  .vr-tbl td:nth-child(1){font-size:15.5px;font-weight:700;color:var(--navy-d)}
+  .vr-tbl td:nth-child(2)::before{content:"Category"}
+  .vr-tbl td:nth-child(3)::before{content:"Source override"}
+  .vr-tbl td:nth-child(4)::before{content:"Notes"}
+  .vr-tbl td:nth-child(5){display:flex;gap:8px;margin-top:4px}
+  .vr-tbl td:nth-child(5) .btn{flex:1;justify-content:center;padding:10px;font-size:14px}
+  .vr-tbl td:empty{display:none}
+  .vr-tbl tr.vr-edit td:nth-child(1){font-size:13.5px;font-weight:400}
+  .vr-tbl tr.vr-edit td:nth-child(1)::before{content:"Keyword"}
+  .vr-tbl td input,.vr-tbl td select{width:100% !important;padding:9px 10px !important;font-size:14px}
+}
