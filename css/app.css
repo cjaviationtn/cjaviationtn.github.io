@@ -394,3 +394,79 @@
     .vm-out{border:1px solid #bbb;background:#fff}
     .vm-btns{display:none !important}
   }
+
+/* ======================= CTK — print / PDF ======================= */
+@media print{
+  .cal-stat-print{font-size:8.5px}
+  /* summary strip: one short row instead of four tall cards */
+  .ctk-tiles{gap:6px !important;margin-bottom:10px !important;grid-template-columns:1fr 1fr 1fr 1.9fr !important}
+  .ctk-tiles .tile{padding:6px 8px 6px 12px;break-inside:avoid}
+  .ctk-tiles .tile .label{font-size:7.5px;letter-spacing:.06em}
+  .ctk-tiles .tile .val,.ctk-tiles .tile .val.small{font-size:13px;margin-top:2px;line-height:1.25}
+  .ctk-tiles .tile:last-child .val{font-size:9.5px;font-weight:700}
+  .ctk-tiles .tile .foot{font-size:7.5px;margin-top:1px}
+  /* table: fixed column widths, small type, no split rows, header repeats per page */
+  .ctk-tbl{table-layout:fixed;font-size:9px}
+  .ctk-tbl thead{display:table-header-group}
+  .ctk-tbl tr{break-inside:avoid}
+  .ctk-tbl th{font-size:7.5px;padding:5px 6px;letter-spacing:.05em}
+  .ctk-tbl td{padding:5px 6px;font-size:9px;vertical-align:top}
+  .ctk-tbl td strong{font-size:9px}
+  .ctk-tbl th:nth-child(1),.ctk-tbl td:nth-child(1){width:25%}
+  .ctk-tbl th:nth-child(2),.ctk-tbl td:nth-child(2){width:10%}
+  .ctk-tbl th:nth-child(3),.ctk-tbl td:nth-child(3){width:7%}
+  .ctk-tbl th:nth-child(4),.ctk-tbl td:nth-child(4){width:10%}
+  .ctk-tbl th:nth-child(5),.ctk-tbl td:nth-child(5){width:9%}
+  .ctk-tbl th:nth-child(6),.ctk-tbl td:nth-child(6){width:12%}
+  .ctk-tbl th:nth-child(7),.ctk-tbl td:nth-child(7){width:27%}
+  .ctk-tbl td:nth-child(2),.ctk-tbl td:nth-child(3),.ctk-tbl td:nth-child(4){white-space:nowrap}
+  .ctk-tbl tbody tr:nth-child(even) td{background:#faf8f3;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .ctk-tbl th:nth-child(7){font-size:0}
+  .ctk-tbl th:nth-child(7)::after{content:"Notes";font-size:7.5px;letter-spacing:.05em}
+  .cal-ids{font-size:8px;color:#5a6674;font-weight:400}
+  .cal-loc{font-size:7.5px;padding:0;border:0;background:none;color:#6b7a88;margin-top:1px}
+  .cal-badge{font-size:7.5px;padding:1px 5px}
+  .cal-note{font-size:8px;max-width:none}
+}
+
+/* ============ Phone (≤620px): 4-tile summary strips go 2×2 on every tab ============ */
+/* Dashboard, Purchase Orders, Payroll, CTK all use .grid.g4 for their top four cards.
+   The rule above stacks them one per row on phones; this makes them a compact 2×2. */
+@media (max-width:620px){
+  .g4{grid-template-columns:1fr 1fr !important;gap:8px !important}
+  .g4 .tile{padding:8px 10px 8px 14px}
+  .g4 .tile .label{font-size:9px;letter-spacing:.04em}
+  .g4 .tile .val,.g4 .tile .val.small{font-size:18px;margin-top:2px}
+  .g4 .tile .foot{display:none}
+  .ctk-tiles{margin-bottom:12px !important}
+  .ctk-tiles .tile:last-child .val{font-size:11px;line-height:1.25}
+}
+
+/* ================= CTK on a phone: every tool becomes a card ================= */
+@media (max-width:620px){
+  .cal-tools .csearch{width:100%}
+  .ctk-wrap{background:transparent;border:0;box-shadow:none;overflow:visible}
+  .ctk-tbl{display:block;font-size:12px}
+  .ctk-tbl thead{display:none}
+  .ctk-tbl tbody{display:block}
+  .ctk-tbl tr{display:flex;flex-wrap:wrap;align-items:flex-start;gap:3px 6px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:11px 12px;margin-bottom:9px}
+  .ctk-tbl tr.cal-over{background:#fdf1ee;border-color:#e3c3bc}
+  .ctk-tbl tr.cal-soon{background:#fdf9ef;border-color:var(--gold-d)}
+  .ctk-tbl tr.cal-over td,.ctk-tbl tr.cal-soon td,.ctk-tbl td{display:block;padding:0;border:0;background:transparent !important}
+  .ctk-tbl td:nth-child(1){order:1;flex:1 1 55%}
+  .ctk-tbl td:nth-child(1) strong{font-size:14px;line-height:1.25}
+  .ctk-tbl td:nth-child(5){order:2;flex:0 0 auto;margin-left:auto}
+  .ctk-tbl td:nth-child(2),.ctk-tbl td:nth-child(3),.ctk-tbl td:nth-child(4){order:3;flex:0 0 auto;font-size:11.5px;color:#4a5a6a;margin-top:6px}
+  .ctk-tbl td:nth-child(2)::before{content:"Last cal ";color:var(--muted)}
+  .ctk-tbl td:nth-child(3)::before{content:"· "}
+  .ctk-tbl td:nth-child(4)::before{content:"· Due ";color:var(--muted)}
+  .ctk-tbl td:nth-child(4) strong{font-size:11.5px}
+  .ctk-tbl td:nth-child(6){order:6;flex:0 0 100%;margin-top:6px}
+  .ctk-tbl td:nth-child(6) .cal-sel{width:100%;min-width:0;padding:8px 10px;font-size:12.5px}
+  .ctk-tbl td:nth-child(7){order:7;flex:0 0 100%;margin-top:4px}
+  .cal-note{max-width:none;font-size:11px}
+  .cal-act{margin-top:8px !important;gap:8px}
+  .cal-act .btn{flex:1;justify-content:center;padding:9px 10px;font-size:12.5px}
+  .cal-act .btn.ghost{flex:0 0 76px}
+  .ctk-tbl td[colspan]{flex:0 0 100%;text-align:center;padding:18px 0 !important}
+}
