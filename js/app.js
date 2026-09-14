@@ -2123,7 +2123,7 @@ function calTiles(){
   var upcoming=all.filter(function(x){return x.due&&x.status!=='Out for Calibration';})
                   .sort(function(a,b){return calParse(a.due)-calParse(b.due);})[0];
   if(upcoming) next=calPretty(upcoming.due)+' · '+upcoming.name;
-  return '<div class="grid g4" style="margin-bottom:18px">'
+  return '<div class="grid g4 ctk-tiles" style="margin-bottom:18px">'
     +tile(over?'red':'ok','Overdue',String(over),over?'needs attention now':'nothing past due')
     +tile(soon?'warn':'ok','Due within 30 days',String(soon),'plan these')
     +tile('navy','Out for calibration',String(out),'awaiting return')
@@ -2232,7 +2232,7 @@ function vCal(){
       +'<button class="btn sm" id="cal-add" style="margin-left:auto">＋ Add tool</button>'
       +'<button class="btn sm ghost" id="cal-refresh">↻ Refresh</button>'
     +'</div>'
-    +'<div class="card scroll"><table class="tb ctk-tbl"><thead><tr>'
+    +'<div class="card scroll ctk-wrap"><table class="tb ctk-tbl"><thead><tr>'
       +'<th>Tool</th><th>Last Calibrated</th><th>Interval</th><th>Next Due</th><th>Status</th><th>Record Status</th><th>Notes / Actions</th>'
     +'</tr></thead><tbody id="cal-body">'+calBody()+'</tbody></table></div>'
     +'<div class="hint" style="margin:10px 4px">Rows are sorted by next due date. Set a tool to Out for Calibration when you ship it; when it comes back, hit "✓ Calibrated", pick the certificate date, and the next due date rolls forward from that date.</div>';
