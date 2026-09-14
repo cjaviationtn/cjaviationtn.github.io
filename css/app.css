@@ -435,11 +435,11 @@
 @media (max-width:620px){
   .g4{grid-template-columns:1fr 1fr !important;gap:8px !important}
   .g4 .tile{padding:8px 10px 8px 14px}
-  .g4 .tile .label{font-size:9px;letter-spacing:.04em}
-  .g4 .tile .val,.g4 .tile .val.small{font-size:18px;margin-top:2px}
+  .g4 .tile .label{font-size:11px;letter-spacing:.04em}
+  .g4 .tile .val,.g4 .tile .val.small{font-size:20px;margin-top:3px}
   .g4 .tile .foot{display:none}
   .ctk-tiles{margin-bottom:12px !important}
-  .ctk-tiles .tile:last-child .val{font-size:11px;line-height:1.25}
+  .ctk-tiles .tile:last-child .val{font-size:12.5px;line-height:1.25}
 }
 
 /* ================= CTK on a phone: every tool becomes a card ================= */
@@ -454,19 +454,22 @@
   .ctk-tbl tr.cal-soon{background:#fdf9ef;border-color:var(--gold-d)}
   .ctk-tbl tr.cal-over td,.ctk-tbl tr.cal-soon td,.ctk-tbl td{display:block;padding:0;border:0;background:transparent !important}
   .ctk-tbl td:nth-child(1){order:1;flex:1 1 55%}
-  .ctk-tbl td:nth-child(1) strong{font-size:14px;line-height:1.25}
+  .ctk-tbl td:nth-child(1) strong{font-size:15.5px;line-height:1.25}
+  .ctk-tbl .cal-ids{font-size:12.5px}
+  .ctk-tbl .cal-loc{font-size:12px}
+  .ctk-tbl .cal-badge{font-size:12px}
   .ctk-tbl td:nth-child(5){order:2;flex:0 0 auto;margin-left:auto}
-  .ctk-tbl td:nth-child(2),.ctk-tbl td:nth-child(3),.ctk-tbl td:nth-child(4){order:3;flex:0 0 auto;font-size:11.5px;color:#4a5a6a;margin-top:6px}
+  .ctk-tbl td:nth-child(2),.ctk-tbl td:nth-child(3),.ctk-tbl td:nth-child(4){order:3;flex:0 0 auto;font-size:13px;color:#4a5a6a;margin-top:6px}
   .ctk-tbl td:nth-child(2)::before{content:"Last cal ";color:var(--muted)}
   .ctk-tbl td:nth-child(3)::before{content:"· "}
   .ctk-tbl td:nth-child(4)::before{content:"· Due ";color:var(--muted)}
-  .ctk-tbl td:nth-child(4) strong{font-size:11.5px}
+  .ctk-tbl td:nth-child(4) strong{font-size:13px}
   .ctk-tbl td:nth-child(6){order:6;flex:0 0 100%;margin-top:6px}
-  .ctk-tbl td:nth-child(6) .cal-sel{width:100%;min-width:0;padding:8px 10px;font-size:12.5px}
+  .ctk-tbl td:nth-child(6) .cal-sel{width:100%;min-width:0;padding:9px 10px;font-size:14px}
   .ctk-tbl td:nth-child(7){order:7;flex:0 0 100%;margin-top:4px}
-  .cal-note{max-width:none;font-size:11px}
+  .cal-note{max-width:none;font-size:12.5px}
   .cal-act{margin-top:8px !important;gap:8px}
-  .cal-act .btn{flex:1;justify-content:center;padding:9px 10px;font-size:12.5px}
+  .cal-act .btn{flex:1;justify-content:center;padding:10px 10px;font-size:14px}
   .cal-act .btn.ghost{flex:0 0 76px}
   .ctk-tbl td[colspan]{flex:0 0 100%;text-align:center;padding:18px 0 !important}
 }
@@ -475,8 +478,8 @@
 @media (max-width:620px){
   .tile-pair{grid-template-columns:1fr 1fr !important;gap:8px !important}
   .tile-pair .tile{padding:8px 10px 8px 14px}
-  .tile-pair .tile .label{font-size:9px;letter-spacing:.04em}
-  .tile-pair .tile .val,.tile-pair .tile .val.small{font-size:18px;margin-top:2px}
+  .tile-pair .tile .label{font-size:11px;letter-spacing:.04em}
+  .tile-pair .tile .val,.tile-pair .tile .val.small{font-size:20px;margin-top:3px}
   .tile-pair .tile .foot{display:none}
 }
 
@@ -488,7 +491,7 @@
   .pe-tbl tbody{display:block}
   .pe-tbl tr{display:flex;flex-wrap:wrap;gap:8px 10px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
   .pe-tbl td{display:block;padding:0;border:0;background:transparent !important;white-space:normal !important}
-  .pe-tbl td::before{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-bottom:3px}
+  .pe-tbl td::before{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-bottom:3px}
   .pe-tbl td:nth-child(1){flex:0 0 100%;font-size:15px}
   .pe-tbl td:nth-child(2){flex:1 1 30%}
   .pe-tbl td:nth-child(3){flex:1 1 55%}
