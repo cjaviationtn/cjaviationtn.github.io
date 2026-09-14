@@ -470,3 +470,36 @@
   .cal-act .btn.ghost{flex:0 0 76px}
   .ctk-tbl td[colspan]{flex:0 0 100%;text-align:center;padding:18px 0 !important}
 }
+
+/* ============ Phone (≤620px): two-tile rows (Dashboard sales tax) side by side ============ */
+@media (max-width:620px){
+  .tile-pair{grid-template-columns:1fr 1fr !important;gap:8px !important}
+  .tile-pair .tile{padding:8px 10px 8px 14px}
+  .tile-pair .tile .label{font-size:9px;letter-spacing:.04em}
+  .tile-pair .tile .val,.tile-pair .tile .val.small{font-size:18px;margin-top:2px}
+  .tile-pair .tile .foot{display:none}
+}
+
+/* ============ Phone (≤620px): Manage employees — one card per person ============ */
+@media (max-width:620px){
+  .pe-wrap{overflow:visible}
+  .pe-tbl{display:block}
+  .pe-tbl thead{display:none}
+  .pe-tbl tbody{display:block}
+  .pe-tbl tr{display:flex;flex-wrap:wrap;gap:8px 10px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
+  .pe-tbl td{display:block;padding:0;border:0;background:transparent !important;white-space:normal !important}
+  .pe-tbl td::before{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-bottom:3px}
+  .pe-tbl td:nth-child(1){flex:0 0 100%;font-size:15px}
+  .pe-tbl td:nth-child(2){flex:1 1 30%}
+  .pe-tbl td:nth-child(3){flex:1 1 55%}
+  .pe-tbl td:nth-child(4),.pe-tbl td:nth-child(5){flex:1 1 45%}
+  .pe-tbl td:nth-child(6){flex:0 0 100%}
+  .pe-tbl td:nth-child(7){flex:0 0 100%;display:flex;gap:8px;margin-top:2px}
+  .pe-tbl td:nth-child(2)::before{content:"Rate $/hr"}
+  .pe-tbl td:nth-child(3)::before{content:"Role / notes"}
+  .pe-tbl td:nth-child(4)::before{content:"Last pay raise"}
+  .pe-tbl td:nth-child(5)::before{content:"Hire date"}
+  .pe-tbl td:nth-child(6)::before{content:"Time clock link"}
+  .pe-tbl td input{width:100% !important;padding:9px 10px !important;font-size:14px}
+  .pe-tbl td:nth-child(7) .btn{flex:1;justify-content:center;padding:9px 10px !important;font-size:13px !important}
+}
