@@ -1144,6 +1144,7 @@ function wireEntry(){
 
 
 var PO_CACHE=null, PO_FILTER='all', PO_EDIT_ROW=null, PO_MSG=null, PO_SHOW_NEW=false, PO_NEW_ITEMS=null;
+var PO_PAGE=0, PO_PAGE_SIZE=25;   // the PO list is paged, 25 per page
 var PO_TYPES=['Consumable','Customer Part','Bench Stock'];
 var PO_STATUSES=['Open','Partially Received','Received','Closed/Paid','Cancelled'];
 
@@ -1219,6 +1220,11 @@ function paintPO(){
 
 
   var rows=d.rows.filter(poMatchesFilter);
+  var poTotal=rows.length, poPages=Math.max(1,Math.ceil(poTotal/PO_PAGE_SIZE));
+  if(PO_EDIT_ROW!=null){ for(var pe=0;pe<rows.length;pe++){ if(rows[pe].row===PO_EDIT_ROW){ PO_PAGE=Math.floor(pe/PO_PAGE_SIZE); break; } } }
+  if(PO_PAGE>poPages-1) PO_PAGE=poPages-1; if(PO_PAGE<0) PO_PAGE=0;
+  var poFrom=PO_PAGE*PO_PAGE_SIZE;
+  rows=rows.slice(poFrom, poFrom+PO_PAGE_SIZE);
   var body='';
   if(!rows.length){
     body='<tr><td colspan="10" style="text-align:center;padding:22px;color:var(--muted)">No purchase orders match this filter.</td></tr>';
@@ -1241,12 +1247,18 @@ function paintPO(){
     }
   }
 
-  var table='<div class="card pad"><div class="scroll"><table class="tb"><thead><tr>'
+  var table='<div class="card pad po-wrap"><div class="scroll"><table class="tb po-tbl"><thead><tr>'
     + '<th>PO #</th><th>Date</th><th>Vendor</th><th>WO / Aircraft</th><th>Type</th><th>Description</th>'
     + '<th>Status</th><th class="num">Total</th><th>Received</th><th>Invoice / Action</th>'
     + '</tr></thead><tbody>'+body+'</tbody></table></div></div>';
 
-  w.innerHTML=tiles+newBtn+newForm+fbar+table;
+  var pager='';
+  if(poTotal>PO_PAGE_SIZE){
+    pager='<div class="po-pager"><button class="btn sm ghost" data-popage="-1"'+(PO_PAGE===0?' disabled':'')+'>‹ Prev</button>'
+      +'<span>'+(poFrom+1)+'–'+Math.min(poFrom+PO_PAGE_SIZE,poTotal)+' of '+poTotal+'</span>'
+      +'<button class="btn sm ghost" data-popage="1"'+(PO_PAGE>=poPages-1?' disabled':'')+'>Next ›</button></div>';
+  }
+  w.innerHTML=tiles+newBtn+newForm+fbar+table+pager;
   wirePO();
 }
 
@@ -1354,7 +1366,9 @@ function wirePO(){
   };
 
   var fbtns=document.querySelectorAll('[data-pofilter]');
-  for(var i=0;i<fbtns.length;i++) fbtns[i].onclick=function(){ PO_FILTER=this.getAttribute('data-pofilter'); PO_EDIT_ROW=null; paintPO(); };
+  for(var i=0;i<fbtns.length;i++) fbtns[i].onclick=function(){ PO_FILTER=this.getAttribute('data-pofilter'); PO_EDIT_ROW=null; PO_PAGE=0; paintPO(); };
+  var pgb=document.querySelectorAll('[data-popage]');
+  for(var pg=0;pg<pgb.length;pg++) pgb[pg].onclick=function(){ if(this.disabled) return; PO_PAGE+=parseInt(this.getAttribute('data-popage'),10); PO_EDIT_ROW=null; paintPO(); var tb=document.querySelector('.po-wrap'); if(tb) tb.scrollIntoView({block:'start'}); };
 
   var ebtns=document.querySelectorAll('[data-poedit]');
   for(var j=0;j<ebtns.length;j++) ebtns[j].onclick=function(){ PO_EDIT_ROW=parseInt(this.getAttribute('data-poedit'),10); paintPO(); };
