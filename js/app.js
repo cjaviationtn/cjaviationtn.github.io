@@ -1019,7 +1019,7 @@ function vVendors(){
   return topbar('Vendor Rules', rules.length+' auto-categorization rules')
     +addForm
     +'<div style="margin-bottom:12px"><input id="vr-search" placeholder="Search keyword or category…" style="max-width:340px"></div>'
-    +'<div class="card scroll"><table class="tb"><thead>'+thead+'</thead><tbody id="vr-body">'+rows+'</tbody></table></div>';
+    +'<div class="card scroll vr-wrap"><table class="tb vr-tbl"><thead>'+thead+'</thead><tbody id="vr-body">'+rows+'</tbody></table></div>';
 }
 function loadVendors(){
   if(VR_CACHE){ wireVendors(); return; }
