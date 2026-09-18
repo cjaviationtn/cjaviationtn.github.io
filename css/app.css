@@ -174,10 +174,25 @@
   .spin{width:26px;height:26px;border:3px solid var(--cream-d);border-top-color:var(--navy);border-radius:50%;animation:sp 0.8s linear infinite;margin:0 auto 12px}
   @keyframes sp{to{transform:rotate(360deg)}}
 
+  /* phone top bar + drawer (hidden on desktop) */
+  .mbar,.drawer-bg{display:none}
   @media(max-width:900px){
-    .side{display:none} .main,.main.wide{padding:18px;width:100%;max-width:100%;padding-top:calc(18px + env(safe-area-inset-top,0px))}
+    .main,.main.wide{padding:18px;width:100%;max-width:100%;padding-top:calc(70px + env(safe-area-inset-top,0px))}
     .g4,.g3,.g2{grid-template-columns:1fr 1fr} .form-row{grid-template-columns:1fr}
-    .mobile-nav{display:flex !important}
+    .mobile-nav{display:none !important}
+    .mbar{display:flex;align-items:center;gap:12px;position:fixed;left:0;right:0;top:0;z-index:70;height:calc(52px + env(safe-area-inset-top,0px));
+      padding:env(safe-area-inset-top,0px) 14px 0;background:var(--navy);color:#fff;box-shadow:0 1px 4px rgba(31,53,73,.25)}
+    .mbar-btn{width:40px;height:40px;flex:none;border:0;border-radius:9px;background:rgba(255,255,255,.1);color:#fff;font-size:20px;line-height:1;cursor:pointer;padding:0;width:40px}
+    .mbar-btn:active{background:rgba(255,255,255,.22)}
+    .mbar-title{flex:1;min-width:0;font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .mbar .logo-badge{width:34px;height:34px}
+    .side{display:flex;position:fixed;top:0;bottom:0;left:0;height:100%;width:270px;max-width:85vw;z-index:90;transform:translateX(-105%);transition:transform .22s ease;box-shadow:0 0 30px rgba(0,0,0,.35)}
+    .app.drawer-open .side{transform:none}
+    .side-toggle{display:none}
+    .app.narrow .side{width:270px} .app.narrow .brand .btxt{display:block} .app.narrow .nav button .lbl{display:inline} .app.narrow .nav button{justify-content:flex-start;padding:10px 18px;gap:11px} .app.narrow .side .foot{display:block}
+    .drawer-bg{position:fixed;inset:0;background:rgba(21,42,70,.45);z-index:80;opacity:0;pointer-events:none;transition:opacity .22s}
+    .app.drawer-open .drawer-bg{display:block;opacity:1;pointer-events:auto}
+    body.no-scroll{overflow:hidden}
 
     /* nothing inside main may force the page wider than the window */
     html,body{overflow-x:hidden}
@@ -232,7 +247,7 @@
 
   @media print{
     @page{margin:12mm}
-    .side,.mobile-nav,.print-controls,.pill,.btn,.actions,.hint,.fbtn,.fpop,.rev-banner,.pwabar,#updatebar{display:none !important}
+    .side,.mobile-nav,.mbar,.drawer-bg,.print-controls,.pill,.btn,.actions,.hint,.fbtn,.fpop,.rev-banner,.pwabar,#updatebar{display:none !important}
     .gl-act,.gl-noprint{display:none !important}
     body{background:#fff;color:#000} .main{max-width:none;padding:0} .app{display:block}
     .topbar{margin-bottom:8px} .topbar h2{color:#000;font-size:16px} .topbar .sub{font-size:11px}

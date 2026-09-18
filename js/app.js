@@ -120,9 +120,14 @@ function buildShell(){
     +'<div class="foot">Reads &amp; writes your Google Sheet live.<br>Loaded '+esc(DATA.generatedAt)+'.'
     +'<div class="verstamp" id="verstamp"></div>'
     +'<div class="who">'+esc((CJ.session()||{}).email||'')+' · <a href="#" id="signout">Sign out</a></div></div>'
-    +'</aside><main class="main"><div class="mobile-nav" id="mnav"></div><div id="content"></div></main>'+pwaBarHtml()+'</div>';
+    +'</aside><div class="drawer-bg" id="drawer-bg"></div>'
+    +'<main class="main"><div class="mbar" id="mbar"><button class="mbar-btn" id="mbar-menu" aria-label="Menu" title="Menu">\u2630</button><div class="mbar-title" id="mbar-title"></div><div class="logo-badge"></div></div>'
+    +'<div class="mobile-nav" id="mnav"></div><div id="content"></div></main>'+pwaBarHtml()+'</div>';
   var btns=document.querySelectorAll('#nav button');
   for(var j=0;j<btns.length;j++) btns[j].onclick=function(){ render(this.getAttribute('data-view')); };
+  var mb=document.getElementById('mbar-menu'), bg=document.getElementById('drawer-bg');
+  if(mb) mb.onclick=drawerToggle;
+  if(bg) bg.onclick=function(){ drawerToggle(false); };
 
   var so=document.getElementById('signout'); if(so) so.onclick=function(ev){ ev.preventDefault(); signOut(); };
   var tog=document.getElementById('side-toggle');
@@ -162,7 +167,16 @@ function render(v){
   if(v==='mr') wireMR();
   updateBar();
 }
+/* phone: the sidebar becomes a slide-in drawer behind the ☰ in the top bar */
+function drawerToggle(open){
+  var app=document.querySelector('.app'); if(!app) return;
+  if(open==null) open=!app.classList.contains('drawer-open');
+  app.classList.toggle('drawer-open',open);
+  document.body.classList.toggle('no-scroll',open);
+}
 function renderMnav(){
+  drawerToggle(false);
+  var mt=document.getElementById('mbar-title'); if(mt) mt.textContent=VIEW_TITLE[current]||'';
   var html='';
   for(var i=0;i<NAV.length;i++) html+='<button data-view="'+NAV[i][0]+'" class="'+(NAV[i][0]===current?'active':'')+'">'+NAV[i][2]+'</button>';
   $('#mnav').innerHTML=html;
