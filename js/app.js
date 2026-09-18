@@ -503,6 +503,9 @@ function finRows(items,opts){
 }
 function finSecHead(name,total,note){ return '<div class="fin-sec"><h3>'+esc(name)+(note?'<span class="fin-pct">'+esc(note)+'</span>':'')+'</h3><div class="t">'+(total==null?'':acctMoney(total))+'</div></div>'; }
 function finSum2(label,val,cls,note){ return '<div class="fin-row '+(cls||'sum')+'"><div class="n">'+esc(label)+(note?'<span class="fin-pct">'+esc(note)+'</span>':'')+'</div><div></div><div class="v">'+acctMoney(val)+'</div></div>'; }
+/* footers read as one sentence: lower-case account words, keep proper nouns/acronyms */
+function finLc(s){ return String(s).replace(/[A-Za-z]+/g,function(w){ return /^(AMEX|Venmo|VolFed|OpEx|YTD|A\/R|PayPal|Zelle|USAA|Chase|TBX)$/i.test(w)?w:w.toLowerCase(); }); }
+function finCap(s){ s=String(s); return s.charAt(0).toUpperCase()+s.slice(1); }
 function finK(n){ n=Number(n)||0; var s='$'+Math.abs(Math.round(n)).toLocaleString('en-US'); return n<0?'('+s+')':s; }
 
 function finBridge(rev,cogs,gp,opex,net){
@@ -555,20 +558,20 @@ function finBuild(){
   /* asset groups for the stacked bar */
   var cash=0, ar=0, other=0, cashItems=[];
   for(var a=0;a<sAss.items.length;a++){ var it=sAss.items[a];
-    if(/cash|checking|savings|venmo/i.test(it.label)){ cash+=it.value; cashItems.push(it.label.replace(/^Cash \/ /,'').replace(/VolFed |Business |Account/g,'').trim()); }
+    if(/cash|checking|savings|venmo/i.test(it.label)){ cash+=it.value; cashItems.push(finLc(it.label.replace(/^Cash \/ /,'').replace(/VolFed |Business |Account/g,'').trim())); }
     else if(/receivable/i.test(it.label)) ar+=it.value; else other+=it.value; }
   var amex=findVal(BS,'AMEX Credit Card');
   var sales=findVal(BS,'Sales Tax Payable');
 
   /* revenue mix for the KPI foot */
-  var mix=[]; for(var m=0;m<sRev.items.length;m++){ var ri=sRev.items[m]; if(rev&&ri.value/rev>=0.05) mix.push(ri.label.replace(/ Income$/,'').replace(/^Maintenance /,'').replace(/ Sales$/,'')+' '+Math.round(ri.value/rev*100)+'%'); }
+  var mix=[]; for(var m=0;m<sRev.items.length;m++){ var ri=sRev.items[m]; if(rev&&ri.value/rev>=0.05) mix.push(finLc(ri.label.replace(/ Income$/,'').replace(/^Maintenance /,'').replace(/ Sales$/,''))+' '+Math.round(ri.value/rev*100)+'%'); }
 
   var owedOut=(amex>0?amex:0)+(sales>0?sales:0);
   var kpis='<div class="grid fin-kpis" id="fin-kpis">'
-    +tile('navy','Revenue',money(rev),esc(mix.slice(0,2).join(' · ')))
+    +tile('navy','Revenue',money(rev),esc(finCap(mix.slice(0,2).join(' · '))))
     +tile('ok','Gross Profit',money(gp),finPct(gp,rev)+' margin · OpEx '+finPct(opex,rev)+' of revenue')
     +tile(net<0?'red':'ok','Net Income','<span class="'+(net<0?'neg':'pos')+'">'+money(net)+'</span>',net<0?'Loss YTD':'Profit YTD')
-    +tile('navy','Cash on hand',money(cash),esc(cashItems.join(' + ')))
+    +tile('navy','Cash on hand',money(cash),esc(finCap(cashItems.join(' + '))))
     +tile('','Owed to us',money(ar),'Accounts receivable')
     +tile(owedOut>0?'warn':'','Owed out','<span class="neg" id="fin-owed">'+money(owedOut)+'</span>','<span id="fin-owed-foot">'+finOwedFoot(amex,sales,null)+'</span>')
     +'</div>';
