@@ -1316,6 +1316,7 @@ var PO_CACHE=null, PO_FILTER='all', PO_EDIT_ROW=null, PO_MSG=null, PO_SHOW_NEW=f
 var PO_PAGE=0, PO_PAGE_SIZE=25;   // the PO list is paged, 25 per page
 var PO_TYPES=['Consumable','Customer Part','Bench Stock'];
 var PO_STATUSES=['Open','Partially Received','Received','Closed/Paid','Cancelled'];
+var PO_IMP=null, PO_IMP_BUSY=false, PO_IMP_ERR=null;   /* invoice PDF import */
 
 function vPO(){
   return topbar('Purchase Orders','Create, track, receive and close POs — writes live to your PO System sheet','live · PO sheet')
@@ -1356,7 +1357,8 @@ function paintPO(){
 
 
   var newBtn='<div class="actions"><button class="btn gold" id="po-newtoggle">＋ New Purchase Order</button>'
-    + '<button class="btn ghost" id="po-pull">⤓ Pull vendor emails</button>'
+    + '<button class="btn ghost" id="po-import">⤒ Import invoice PDF</button>'
+    + '<input type="file" id="po-impfile" accept="application/pdf,.pdf" style="display:none">'
     + '<span class="pill">Next number: <b>'+esc(d.nextPO)+'</b></span></div>';
 
   var today=new Date().toISOString().slice(0,10);
@@ -1427,7 +1429,7 @@ function paintPO(){
       +'<span>'+(poFrom+1)+'–'+Math.min(poFrom+PO_PAGE_SIZE,poTotal)+' of '+poTotal+'</span>'
       +'<button class="btn sm ghost" data-popage="1"'+(PO_PAGE>=poPages-1?' disabled':'')+'>Next ›</button></div>';
   }
-  w.innerHTML=tiles+newBtn+newForm+fbar+table+pager;
+  w.innerHTML=tiles+newBtn+poImpCard()+newForm+fbar+table+pager;
   wirePO();
 }
 
@@ -1520,19 +1522,7 @@ function wirePO(){
   var cn=$('#po-cancelnew'); if(cn) cn.onclick=function(){ PO_SHOW_NEW=false; PO_NEW_ITEMS=null; paintPO(); };
   if(PO_SHOW_NEW){ poRenderItems(); var ai=$('#po-additem'); if(ai) ai.onclick=function(){ if(!PO_NEW_ITEMS) PO_NEW_ITEMS=[]; PO_NEW_ITEMS.push({qty:'',part:'',desc:'',price:''}); poRenderItems(); }; }
 
-  var pull=$('#po-pull');
-  if(pull) pull.onclick=function(){
-    pull.disabled=true; pull.textContent='Checking email…';
-    google.script.run
-      .withSuccessHandler(function(res){
-        PO_CACHE=res.data;
-        var m='✓ '+res.updated+' row(s) updated from email.';
-        if(res.notes && res.notes.length) m+='  Needs attention: '+res.notes.join('  ·  ');
-        PO_MSG=m; paintPO();
-      })
-      .withFailureHandler(function(e){ pull.disabled=false; pull.textContent='⤓ Pull vendor emails'; alert('Could not pull emails: '+(e.message||e)); })
-      .poPullEmails();
-  };
+  poImpWire();
 
   var fbtns=document.querySelectorAll('[data-pofilter]');
   for(var i=0;i<fbtns.length;i++) fbtns[i].onclick=function(){ PO_FILTER=this.getAttribute('data-pofilter'); PO_EDIT_ROW=null; PO_PAGE=0; paintPO(); };
@@ -1600,6 +1590,395 @@ function wirePO(){
   };
 }
 
+
+
+/* ===================== Import invoice PDF — Purchase Orders ==============
+ * Reads a vendor invoice PDF in the browser with PDF.js, using each text
+ * item's x/y so column-positional layouts (Aircraft Spruce) survive, then
+ * shows a review screen. Nothing reaches the sheet until Commit is pressed.
+ * ------------------------------------------------------------------------ */
+var PO_IMP=null, PO_IMP_BUSY=false, PO_IMP_ERR=null;
+var PO_PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+var PO_PDFJS_W='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+var PO_IMP_TERMS=['CREDIT CARD','NET 30','NET 15','NET 10','NET 60','PREPAID','COD'];
+
+function poImpLoad(cb,bad){
+  if(window.pdfjsLib){ cb(); return; }
+  var s=document.createElement('script');
+  s.src=PO_PDFJS;
+  s.onload=function(){
+    if(!window.pdfjsLib){ bad(new Error('The PDF reader loaded but did not start.')); return; }
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc=PO_PDFJS_W;
+    cb();
+  };
+  s.onerror=function(){ bad(new Error('Could not load the PDF reader — check your connection.')); };
+  document.head.appendChild(s);
+}
+
+/* ---- text items -> positioned rows (vendor agnostic) ---- */
+function poImpRows(items){
+  var tol=2.2, rows=[], i, j, it, y, placed, r;
+  for(i=0;i<items.length;i++){
+    it=items[i];
+    if(!it.str||!it.str.replace(/\s/g,'')) continue;
+    y=Math.round(it.transform[5]*100)/100;
+    placed=false;
+    for(j=0;j<rows.length;j++){
+      if(Math.abs(rows[j].y-y)<=tol){ rows[j].cells.push({x:it.transform[4],s:it.str}); placed=true; break; }
+    }
+    if(!placed) rows.push({y:y,cells:[{x:it.transform[4],s:it.str}]});
+  }
+  rows.sort(function(a,b){ return b.y-a.y; });
+  for(i=0;i<rows.length;i++){
+    r=rows[i];
+    r.cells.sort(function(a,b){ return a.x-b.x; });
+    r.text='';
+    for(j=0;j<r.cells.length;j++){
+      if(j>0 && (r.cells[j].x-(r.cells[j-1].x+r.cells[j-1].s.length*3.2))>4) r.text+='  ';
+      else if(j>0) r.text+=' ';
+      r.text+=r.cells[j].s;
+    }
+    r.text=r.text.replace(/\s+$/,'');
+  }
+  return rows;
+}
+function poImpNum(s){ var x=parseFloat(String(s).replace(/[^0-9.\-]/g,'')); return isFinite(x)?x:0; }
+function poImpFind(rows,re){ for(var i=0;i<rows.length;i++) if(re.test(rows[i].text)) return i; return -1; }
+function poImpNext(rows,i){ for(var n=i+1;n<rows.length;n++) if(rows[n].text.replace(/\s/g,'')) return rows[n]; return null; }
+function poImpKey(s){ return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
+
+/* ---- Aircraft Spruce ---- */
+function poImpSpruce(rows){
+  var o={vendor:'Aircraft Spruce',orderNo:'',invoiceNo:'',custPO:'',invoiceDate:'',shipVia:'',terms:'',
+         items:[],subtotal:0,tax:0,misc:0,shipping:0,paidWithOrder:0,balanceDue:0,warnings:[]};
+  var i,m,rest,k;
+
+  i=poImpFind(rows,/ORDER\s*NO\.[\s\S]*INVOICE\s*NO\./i);
+  if(i<0){ o.warnings.push('Could not find the invoice header row.'); }
+  else{
+    var hr=poImpNext(rows,i), raw=hr?hr.text.replace(/\s+/g,' ').replace(/^\s+/,''):'';
+    m=raw.match(/^(\d{6,10})\s+(\d{6,10})\s*(.*)$/);
+    if(!m){ o.warnings.push('Could not read the order and invoice numbers.'); }
+    else{
+      o.orderNo=m[1]; o.invoiceNo=m[2]; rest=m[3];
+      m=rest.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})\s*$/);
+      if(m){ o.invoiceDate=m[1]; rest=rest.slice(0,m.index).replace(/\s+$/,''); }
+      else o.warnings.push('No invoice date found.');
+      for(k=0;k<PO_IMP_TERMS.length;k++){
+        if(rest.toUpperCase().slice(-PO_IMP_TERMS[k].length)===PO_IMP_TERMS[k]){
+          o.terms=PO_IMP_TERMS[k]; rest=rest.slice(0,rest.length-PO_IMP_TERMS[k].length).replace(/\s+$/,''); break;
+        }
+      }
+      m=rest.match(/((?:UPS|FEDEX|FED EX|USPS|DHL|TRUCK|WILL CALL)[A-Z0-9 .\-]*)$/i);
+      if(m){ o.shipVia=m[1].replace(/\s+$/,''); rest=rest.slice(0,m.index); }
+      o.custPO=rest.replace(/^\s+|\s+$/g,'');
+    }
+  }
+
+  var IT=/^\s*(\d+)\s+(?:(\d+)\s+)?(.+?)\s+(\d{1,2})%\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s*$/;
+  for(i=0;i<rows.length;i++){
+    m=rows[i].text.replace(/\s+/g,' ').replace(/^\s+|\s+$/g,'').match(IT);
+    if(m) o.items.push({qty:parseInt(m[1],10),part:'',desc:m[3].replace(/^\s+|\s+$/g,''),
+                        discountPct:parseInt(m[4],10),price:poImpNum(m[5]),amount:poImpNum(m[6])});
+  }
+  if(!o.items.length) o.warnings.push('No line items could be read.');
+
+  i=poImpFind(rows,/SUBTOTAL[\s\S]*BALANCE\s*DUE/i);
+  if(i<0) o.warnings.push('Could not find the totals row.');
+  else{
+    var tr=poImpNext(rows,i), nums=tr?(tr.text.match(/[\d,]+\.\d{2}/g)||[]):[];
+    if(nums.length!==6) o.warnings.push('Expected six totals, read '+nums.length+'.');
+    else{
+      o.subtotal=poImpNum(nums[0]); o.tax=poImpNum(nums[1]); o.misc=poImpNum(nums[2]);
+      o.shipping=poImpNum(nums[3]); o.paidWithOrder=poImpNum(nums[4]); o.balanceDue=poImpNum(nums[5]);
+    }
+  }
+  return o;
+}
+
+/* ---- generic fallback ---- */
+function poImpGeneric(rows){
+  var o={vendor:'',orderNo:'',invoiceNo:'',custPO:'',invoiceDate:'',shipVia:'',terms:'',
+         items:[],subtotal:0,tax:0,misc:0,shipping:0,paidWithOrder:0,balanceDue:0,
+         warnings:['This vendor has no parser yet — header figures only, no line items. Fill in the rest yourself.']};
+  var all='',i,m;
+  for(i=0;i<rows.length;i++) all+=rows[i].text+'\n';
+  m=all.match(/(?:INVOICE|INV)\s*(?:NO\.?|#|NUMBER)?\s*:?\s*([A-Z0-9\-]{4,})/i);  if(m) o.invoiceNo=m[1];
+  m=all.match(/(?:CUST(?:OMER)?\.?\s*)?P\.?\s*O\.?\s*(?:NO\.?|#|NUMBER)?\s*:?\s*([A-Z0-9\-\s]{3,20})/i); if(m) o.custPO=m[1].replace(/^\s+|\s+$/g,'');
+  m=all.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);                                     if(m) o.invoiceDate=m[1];
+  m=all.match(/SUB\s*TOTAL\s*:?\s*\$?([\d,]+\.\d{2})/i);                          if(m) o.subtotal=poImpNum(m[1]);
+  m=all.match(/(?:FREIGHT|SHIPPING)\s*:?\s*\$?([\d,]+\.\d{2})/i);                 if(m) o.shipping=poImpNum(m[1]);
+  m=all.match(/\bTAX\s*:?\s*\$?([\d,]+\.\d{2})/i);                                if(m) o.tax=poImpNum(m[1]);
+  m=all.match(/BALANCE\s*DUE\s*:?\s*\$?([\d,]+\.\d{2})/i);                        if(m) o.balanceDue=poImpNum(m[1]);
+  return o;
+}
+
+function poImpParse(rows){
+  var all='',i;
+  for(i=0;i<rows.length && i<40;i++) all+=rows[i].text+'\n';
+  if(/AIRCRAFT\s+SPRUCE/i.test(all)) return poImpSpruce(rows);
+  var g=poImpGeneric(rows);
+  var m=rows.length?rows[0].text.replace(/^\s+|\s+$/g,''):'';
+  if(m && m.length<48) g.vendor=m;
+  return g;
+}
+
+/* ---- seed the editable review state ---- */
+function poImpSeed(p){
+  var i,sum=0;
+  for(i=0;i<p.items.length;i++) sum+=p.items[i].amount;
+  sum=Math.round(sum*100)/100;
+  var iso='';
+  if(p.invoiceDate){
+    var d=p.invoiceDate.split('/');
+    if(d.length===3){
+      var yy=d[2].length===2?('20'+d[2]):d[2];
+      iso=yy+'-'+('0'+d[0]).slice(-2)+'-'+('0'+d[1]).slice(-2);
+    }
+  }
+  var pre=p.custPO?p.custPO:((PO_CACHE&&PO_CACHE.nextPO)||'');
+  return {parsed:p, po:pre, matchedFromInvoice:!!p.custPO,
+          vendor:p.vendor||'', wo:'', type:'Customer Part', status:'Open',
+          date:iso||new Date().toISOString().slice(0,10),
+          shipping:p.shipping?p.shipping.toFixed(2):'0.00',
+          tax:p.tax?p.tax.toFixed(2):'0.00',
+          items:p.items.slice(0), lineSum:sum};
+}
+function poImpFail(e){
+  PO_IMP_BUSY=false; PO_IMP=null;
+  PO_IMP_ERR=(e&&e.message)?e.message:String(e);
+  paintPO();
+}
+function poImpOnFile(file){
+  if(!file) return;
+  if(!/\.pdf$/i.test(file.name)){ PO_IMP_ERR='That is not a PDF.'; paintPO(); return; }
+  PO_IMP_ERR=null; PO_IMP=null; PO_IMP_BUSY=true; paintPO();
+  poImpLoad(function(){
+    var fr=new FileReader();
+    fr.onload=function(){
+      try{
+        window.pdfjsLib.getDocument({data:new Uint8Array(fr.result)}).promise
+          .then(function(doc){ return doc.getPage(1).then(function(pg){ return pg.getTextContent(); }); })
+          .then(function(tc){
+            var p=poImpParse(poImpRows(tc.items));
+            p.fileName=file.name;
+            PO_IMP=poImpSeed(p); PO_IMP_BUSY=false; paintPO();
+          })['catch'](poImpFail);
+      }catch(err){ poImpFail(err); }
+    };
+    fr.onerror=function(){ poImpFail(new Error('Could not read that file.')); };
+    fr.readAsArrayBuffer(file);
+  }, poImpFail);
+}
+
+/* ---- live figures ---- */
+function poImpSum(){
+  var t=0,a=(PO_IMP&&PO_IMP.items)||[],i;
+  for(i=0;i<a.length;i++) t+=(Number(a[i].qty)||0)*(Number(a[i].price)||0);
+  return Math.round(t*100)/100;
+}
+function poImpVerified(){
+  if(!PO_IMP) return false;
+  var s=PO_IMP.parsed.subtotal;
+  if(!s) return PO_IMP.items.length>0;
+  return Math.abs(poImpSum()-s)<0.005;
+}
+function poImpTotal(){
+  return Math.round((poImpSum()+(Number(PO_IMP.shipping)||0)+(Number(PO_IMP.tax)||0))*100)/100;
+}
+
+/* ---- the review card ---- */
+function poImpCard(){
+  if(PO_IMP_BUSY) return '<div class="card pad" style="margin-bottom:18px"><div class="miniload"><div class="spin"></div>Reading the invoice…</div></div>';
+  if(PO_IMP_ERR) return '<div class="card pad" style="margin-bottom:18px"><div class="flash err">'+esc(PO_IMP_ERR)+'</div>'
+    + '<div class="actions" style="margin-top:10px"><button class="btn ghost" id="poimp-close">Close</button></div></div>';
+  if(!PO_IMP) return '';
+
+  var p=PO_IMP.parsed, i;
+  var ok=poImpVerified(), sum=poImpSum();
+
+  var head='<div class="section-title" style="margin-top:0">Import invoice — '+esc(p.fileName||'')+'</div>';
+
+  var banner;
+  if(PO_IMP.matchedFromInvoice)
+    banner='<div class="flash ok">Invoice carries PO number <b>'+esc(p.custPO)+'</b>.</div>';
+  else
+    banner='<div class="flash busy">No PO number printed on this invoice. Filing it as <b>'+esc(PO_IMP.po||'—')+'</b>'
+      +((PO_CACHE&&PO_CACHE.nextPO)?' (next available is '+esc(PO_CACHE.nextPO)+')':'')+'.</div>';
+
+  var warn='';
+  if(p.warnings && p.warnings.length){
+    warn='<div class="flash err" style="margin-top:8px">';
+    for(i=0;i<p.warnings.length;i++) warn+=(i?'<br>':'')+esc(p.warnings[i]);
+    warn+='</div>';
+  }
+
+  var read='<div class="card pad" style="margin:0"><div class="section-title" style="margin-top:0">Read from the PDF</div>'
+    + '<table class="tb"><tbody>'
+    + poImpKV('Vendor',p.vendor)
+    + poImpKV('Order no.',p.orderNo)
+    + poImpKV('Invoice no.',p.invoiceNo)
+    + poImpKV('Cust P.O. no.',p.custPO||'— not present —')
+    + poImpKV('Invoice date',p.invoiceDate)
+    + poImpKV('Ship via',p.shipVia)
+    + poImpKV('Terms',p.terms)
+    + poImpKV('Subtotal',p.subtotal?money(p.subtotal):'')
+    + poImpKV('Freight',p.shipping?money(p.shipping):'$0.00')
+    + poImpKV('Tax',p.tax?money(p.tax):'$0.00')
+    + poImpKV('Paid with order',p.paidWithOrder?money(p.paidWithOrder):'')
+    + poImpKV('Balance due',p.balanceDue!=null?money(p.balanceDue):'')
+    + '</tbody></table></div>';
+
+  var typeOpts='',statOpts='';
+  for(i=0;i<PO_TYPES.length;i++) typeOpts+='<option value="'+PO_TYPES[i]+'"'+(PO_TYPES[i]===PO_IMP.type?' selected':'')+'>'+PO_TYPES[i]+'</option>';
+  for(i=0;i<PO_STATUSES.length;i++) statOpts+='<option value="'+PO_STATUSES[i]+'"'+(PO_STATUSES[i]===PO_IMP.status?' selected':'')+'>'+PO_STATUSES[i]+'</option>';
+
+  var form='<div class="card pad" style="margin:0"><div class="section-title" style="margin-top:0">Writes to the PO Log</div>'
+    + '<div class="form-row"><div><label>PO number</label><input id="poimp-po" value="'+esc(PO_IMP.po)+'"></div>'
+    + '<div><label>Vendor</label><input id="poimp-vendor" value="'+esc(PO_IMP.vendor)+'"></div></div>'
+    + '<div class="form-row"><div><label>Work Order / Aircraft (N-Number)</label><input id="poimp-wo" value="'+esc(PO_IMP.wo)+'" placeholder="required"></div>'
+    + '<div><label>Type</label><select id="poimp-type">'+typeOpts+'</select></div></div>'
+    + '<div class="form-row"><div><label>Status</label><select id="poimp-status">'+statOpts+'</select></div>'
+    + '<div><label>Date</label><input id="poimp-date" type="date" value="'+esc(PO_IMP.date)+'"></div></div>'
+    + '<div class="form-row"><div><label>Shipping</label><input id="poimp-ship" value="'+esc(PO_IMP.shipping)+'"></div>'
+    + '<div><label>Tax</label><input id="poimp-tax" value="'+esc(PO_IMP.tax)+'"></div></div>'
+    + '</div>';
+
+  var body='';
+  for(i=0;i<PO_IMP.items.length;i++){
+    var it=PO_IMP.items[i];
+    body+='<tr>'
+      + '<td><input class="poimp-i" data-i="'+i+'" data-f="qty" type="number" step="any" value="'+esc(it.qty)+'" style="padding:6px"></td>'
+      + '<td><input class="poimp-i" data-i="'+i+'" data-f="part" value="'+esc(it.part||'')+'" style="padding:6px"></td>'
+      + '<td><input class="poimp-i" data-i="'+i+'" data-f="desc" value="'+esc(it.desc||'')+'" style="padding:6px"></td>'
+      + '<td><input class="poimp-i" data-i="'+i+'" data-f="price" type="number" step="0.001" value="'+esc(it.price)+'" style="padding:6px"></td>'
+      + '<td class="num" id="poimp-amt-'+i+'">'+money((Number(it.qty)||0)*(Number(it.price)||0))+'</td>'
+      + '<td><button class="btn ghost" type="button" data-poimprm="'+i+'" style="padding:4px 9px">×</button></td>'
+      + '</tr>';
+  }
+  var itemsTbl='<div class="card pad" style="margin-top:14px"><div class="section-title" style="margin-top:0">Line items</div>'
+    + '<div class="scroll"><table class="tb"><thead><tr>'
+    + '<th style="width:70px">Qty</th><th style="width:120px">Part #</th><th>Description</th>'
+    + '<th style="width:100px">Unit price</th><th class="num" style="width:92px">Line</th><th style="width:32px"></th>'
+    + '</tr></thead><tbody>'+body+'</tbody></table></div>'
+    + '<div class="poimp-foot">'
+    +   '<button class="btn ghost" id="poimp-additem" type="button">＋ Add line</button>'
+    +   '<div><span class="hint">Line items <b id="poimp-sum">'+money(sum)+'</b>'
+    +     (p.subtotal?(' &nbsp;·&nbsp; invoice subtotal <b>'+money(p.subtotal)+'</b>'):'')+'</span> '
+    +     '<span class="chip" id="poimp-chk" style="'+(ok?'background:#dcefe2;color:#256a3f;border-color:#256a3f33':'background:#f7e3df;color:#8a2f22;border-color:#8a2f2233')+'">'
+    +     (ok?'✓ parse verified':'⚠ off by '+money(Math.abs(Math.round((sum-p.subtotal)*100)/100)))+'</span></div>'
+    + '</div>'
+    + '<div class="poimp-foot" style="border:0;padding-top:4px"><span></span>'
+    +   '<div style="font-weight:800;font-size:16px">Order total: <span id="poimp-grand">'+money(poImpTotal())+'</span></div></div>'
+    + '</div>';
+
+  var acts='<div class="actions" style="margin-top:14px">'
+    + '<button class="btn gold" id="poimp-commit">Commit to PO Log</button>'
+    + '<button class="btn ghost" id="poimp-close">Cancel</button>'
+    + '<span class="hint" id="poimp-hint"></span></div>';
+
+  return '<div class="card pad" id="poimp-card" style="margin-bottom:18px">'
+    + head + banner + warn
+    + '<div class="poimp-cols">'+read+form+'</div>'
+    + itemsTbl + acts + '</div>';
+}
+function poImpKV(k,v){
+  return '<tr><td style="color:#5c6771;width:46%">'+esc(k)+'</td><td>'+esc(v||'—')+'</td></tr>';
+}
+
+function poImpRepaintTotals(){
+  var sum=poImpSum(), p=PO_IMP.parsed, ok=poImpVerified();
+  var s=$('#poimp-sum'); if(s) s.innerHTML=money(sum);
+  var g=$('#poimp-grand'); if(g) g.innerHTML=money(poImpTotal());
+  var c=$('#poimp-chk');
+  if(c){
+    c.innerHTML=ok?'✓ parse verified':'⚠ off by '+money(Math.abs(Math.round((sum-p.subtotal)*100)/100));
+    c.style.cssText=ok?'background:#dcefe2;color:#256a3f;border-color:#256a3f33':'background:#f7e3df;color:#8a2f22;border-color:#8a2f2233';
+  }
+  poImpGate();
+}
+function poImpGate(){
+  var b=$('#poimp-commit'), h=$('#poimp-hint');
+  if(!b) return;
+  var wo=$('#poimp-wo')?$('#poimp-wo').value.replace(/^\s+|\s+$/g,''):'';
+  var po=$('#poimp-po')?$('#poimp-po').value.replace(/^\s+|\s+$/g,''):'';
+  var why='';
+  if(!po) why='Enter the PO number this belongs to.';
+  else if(!wo) why='Enter a work order before committing.';
+  else if(!poImpVerified()) why='Totals disagree with the invoice — fix them or cancel.';
+  else if(!PO_IMP.items.length) why='Add at least one line item.';
+  b.disabled=!!why;
+  if(h) h.innerHTML=why?esc(why):'Ready. Nothing has been written yet.';
+}
+
+function poImpWire(){
+  var openBtn=$('#po-import'), input=$('#po-impfile');
+  if(openBtn&&input){
+    openBtn.onclick=function(){ input.value=''; input.click(); };
+    input.onchange=function(){ poImpOnFile(this.files&&this.files[0]); };
+  }
+  var close=$('#poimp-close');
+  if(close) close.onclick=function(){ PO_IMP=null; PO_IMP_ERR=null; paintPO(); };
+  if(!PO_IMP) return;
+
+  var f=['po','vendor','wo','type','status','date','ship','tax'];
+  for(var k=0;k<f.length;k++){
+    (function(name){
+      var el=$('#poimp-'+name); if(!el) return;
+      el.oninput=el.onchange=function(){
+        var key=(name==='ship')?'shipping':name;
+        PO_IMP[key]=this.value;
+        if(name==='ship'||name==='tax'){ var g=$('#poimp-grand'); if(g) g.innerHTML=money(poImpTotal()); }
+        poImpGate();
+      };
+    })(f[k]);
+  }
+
+  var ins=document.querySelectorAll('.poimp-i');
+  for(var i=0;i<ins.length;i++) ins[i].oninput=function(){
+    var idx=parseInt(this.getAttribute('data-i'),10), fld=this.getAttribute('data-f');
+    PO_IMP.items[idx][fld]=(fld==='qty'||fld==='price')?this.value:this.value;
+    var c=$('#poimp-amt-'+idx);
+    if(c) c.innerHTML=money((Number(PO_IMP.items[idx].qty)||0)*(Number(PO_IMP.items[idx].price)||0));
+    poImpRepaintTotals();
+  };
+  var rms=document.querySelectorAll('[data-poimprm]');
+  for(var r=0;r<rms.length;r++) rms[r].onclick=function(){
+    PO_IMP.items.splice(parseInt(this.getAttribute('data-poimprm'),10),1);
+    paintPO();
+  };
+  var add=$('#poimp-additem');
+  if(add) add.onclick=function(){ PO_IMP.items.push({qty:'',part:'',desc:'',price:''}); paintPO(); };
+
+  var commit=$('#poimp-commit');
+  if(commit) commit.onclick=function(){
+    var payload={
+      poNumber:$('#poimp-po').value.replace(/^\s+|\s+$/g,''),
+      vendor:$('#poimp-vendor').value.replace(/^\s+|\s+$/g,''),
+      wo:$('#poimp-wo').value.replace(/^\s+|\s+$/g,''),
+      type:$('#poimp-type').value,
+      status:$('#poimp-status').value,
+      date:$('#poimp-date').value,
+      invoice:PO_IMP.parsed.invoiceNo||'',
+      shipping:$('#poimp-ship').value,
+      tax:$('#poimp-tax').value,
+      items:PO_IMP.items
+    };
+    commit.disabled=true; commit.textContent='Committing…';
+    google.script.run
+      .withSuccessHandler(function(d){
+        PO_CACHE=d; PO_IMP=null; PO_IMP_ERR=null;
+        PO_MSG='✓ Imported invoice into PO '+(d.createdPO||payload.poNumber)+' for '+payload.vendor+'.';
+        paintPO();
+      })
+      .withFailureHandler(function(e){
+        commit.disabled=false; commit.textContent='Commit to PO Log';
+        var h=$('#poimp-hint'); if(h) h.innerHTML=esc(e.message||e);
+      })
+      .poCreate(payload);
+  };
+  poImpGate();
+}
 
 
 var PAY_CACHE=null, PAY_MSG=null, PAY_PANEL=null, PAY_TEDIT=null;
