@@ -600,6 +600,7 @@
 .fin-kpis{grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px}
 .fin-kpis .tile{padding:12px 12px 12px 16px}
 .fin-kpis .tile .val.small{font-size:19px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.fin-kpis .tile .foot{text-transform:capitalize}
 .fin-vs{color:var(--muted);font-weight:400}
 .fin-cols{display:grid;grid-template-columns:1.15fr 1fr;gap:16px;align-items:start;margin-bottom:16px}
 .fin-card{overflow:hidden}
