@@ -583,7 +583,7 @@ function finBuild(){
     +'<div class="fin-body">'
     +'<div class="fin-bsviz"><div class="fin-stack"><div class="lbl">Assets · '+finK(assets)+'</div>'+segs([['Equipment & other',other,' s-fixed'],['A/R',ar,' s-ar'],['Cash',cash,' s-cash']],'')+'</div>'
     +'<div class="fin-stack"><div class="lbl">Liabilities + Equity · '+finK(le)+'</div>'+segs([['Equity',eq,' s-eq']].concat(liabList.map(function(x){ return [x[0],x[1],' s-liab']; })),'')+'</div></div>'
-    +'<div class="fin-balance'+(balanced?'':' bad')+'"><span>'+(balanced?'⚖ Books balance':'⚖ Books do NOT balance')+'</span><span class="num">Check = '+money(chk)+'</span></div>'
+    +'<div class="fin-balance'+(balanced?'':' bad')+'"><span>'+(balanced?'⚖ Books balance':'⚖ Books do NOT balance')+'</span><span class="num">Check = '+money(balanced?0:chk)+'</span></div>'
     +finSecHead(sAss.name||'Assets',assets)+finRows(sAss.items,{bar:'g'})
     +finSecHead(sLia.name||'Liabilities',liab)+finRows(sLia.items,{bar:'r'})
     +finSecHead(sEq.name||"Owner's Equity",eq)+finRows(sEq.items,{nobar:true})
