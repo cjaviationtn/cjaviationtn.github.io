@@ -1624,9 +1624,9 @@ function poImpRows(items){
     y=Math.round(it.transform[5]*100)/100;
     placed=false;
     for(j=0;j<rows.length;j++){
-      if(Math.abs(rows[j].y-y)<=tol){ rows[j].cells.push({x:it.transform[4],s:it.str}); placed=true; break; }
+      if(Math.abs(rows[j].y-y)<=tol){ rows[j].cells.push({x:it.transform[4],w:it.width||0,s:it.str}); placed=true; break; }
     }
-    if(!placed) rows.push({y:y,cells:[{x:it.transform[4],s:it.str}]});
+    if(!placed) rows.push({y:y,cells:[{x:it.transform[4],w:it.width||0,s:it.str}]});
   }
   rows.sort(function(a,b){ return b.y-a.y; });
   for(i=0;i<rows.length;i++){
@@ -1634,7 +1634,8 @@ function poImpRows(items){
     r.cells.sort(function(a,b){ return a.x-b.x; });
     r.text='';
     for(j=0;j<r.cells.length;j++){
-      if(j>0 && (r.cells[j].x-(r.cells[j-1].x+r.cells[j-1].s.length*3.2))>4) r.text+='  ';
+      var gap = j>0 ? (r.cells[j].x-(r.cells[j-1].x+(r.cells[j-1].w||r.cells[j-1].s.length*3.2))) : 0;
+      if(j>0 && gap>4) r.text+='  ';
       else if(j>0) r.text+=' ';
       r.text+=r.cells[j].s;
     }
@@ -1696,31 +1697,206 @@ function poImpSpruce(rows){
   return o;
 }
 
-/* ---- generic fallback ---- */
+/* ---- generic vendor parser: column geometry + sum verification ----
+ * Works from the same positioned rows as the Spruce parser. Finds the line-item header
+ * row by its column labels, maps every cell below it to the nearest column by x, reads
+ * totals either vertically (label ... amount) or horizontally (label row / number row),
+ * then checks the line sum against the subtotal. */
+var PO_IMP_ROLE=[
+  [/AMOUNT|EXTENSION|\bEXT\b|LINE\s*TOTAL|ITEM\s*TOTAL|\bTOTAL\b/i,'amount'],
+  [/UNIT\s*PRICE|NET\s*PRICE|\bPRICE\b|\bRATE\b|\bEACH\b|\bCOST\b/i,'price'],
+  [/\bQTY\b|QUANTITY|\bORDERED\b|\bSHIPPED\b/i,'qty'],
+  [/PART\s*(?:NO|#|NUMBER)?|MODEL|\bSKU\b|ITEM\s*(?:NO|#|NUMBER)\b|\bP\/N\b/i,'part'],
+  [/DESCRIPTION|\bDESC\b|\bITEM\b|PRODUCT|DETAILS/i,'desc'],
+  [/DISCOUNT|\bDISC\b|\bTAX\b|\bBACK\b|\bUNIT\b|\bU\/M\b|\bUOM\b/i,'skip']
+];
+function poImpRole(s){ for(var i=0;i<PO_IMP_ROLE.length;i++) if(PO_IMP_ROLE[i][0].test(s)) return PO_IMP_ROLE[i][1]; return ''; }
+function poImpMoney(s){ var m=String(s).replace(/,/g,'').match(/-?\$?\s*(\d+\.\d{2,3})\s*$/); return m?parseFloat(m[1]):null; }
+function poImpIsMoney(s){ return /^\s*-?\$?\s*[\d,]+\.\d{2,3}\s*$/.test(String(s)); }
+function poImpIsQty(s){ return /^\s*\d+(?:\.\d+)?\s*$/.test(String(s)); }
+var PO_IMP_TOTKEY=[
+  [/SUB\s*TOTAL|MERCHANDISE|ITEM\s*SUBTOTAL/i,'subtotal'],
+  [/BALANCE\s*DUE|AMOUNT\s*DUE/i,'balanceDue'],
+  [/PAID/i,'paidWithOrder'],
+  [/SALES\s*TAX|ESTIMATED\s*TAX|\bTAX\b/i,'tax'],
+  [/SHIPPING|FREIGHT|S\s*&\s*H|HANDLING|DELIVERY/i,'shipping'],
+  [/MISC/i,'misc'],
+  [/\bTOTAL\b/i,'total']
+];
+function poImpTotKey(s){ for(var i=0;i<PO_IMP_TOTKEY.length;i++) if(PO_IMP_TOTKEY[i][0].test(s)) return PO_IMP_TOTKEY[i][1]; return ''; }
+var PO_IMP_MONTHS={JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
+function poImpDateUS(s){
+  var m=String(s).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if(m) return m[1]+'/'+m[2]+'/'+m[3];
+  m=String(s).match(/([A-Z][a-z]{2})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})/);
+  if(m && PO_IMP_MONTHS[m[1].toUpperCase()]) return PO_IMP_MONTHS[m[1].toUpperCase()]+'/'+m[2]+'/'+m[3];
+  m=String(s).match(/(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return parseInt(m[2],10)+'/'+parseInt(m[3],10)+'/'+m[1];
+  return '';
+}
+
+function poImpRuns(cells, gap){
+  var out=[], i, c, last=null;
+  for(i=0;i<cells.length;i++){
+    c=cells[i];
+    var w=(c.w||c.s.length*4.5), x1=c.x+w;
+    if(last && (c.x-last.x1)<=gap){ last.s+=' '+c.s; last.x1=x1; }
+    else { last={x:c.x,x1:x1,s:c.s}; out.push(last); }
+  }
+  for(i=0;i<out.length;i++) out[i].w=out[i].x1-out[i].x;
+  return out;
+}
 function poImpGeneric(rows){
   var o={vendor:'',orderNo:'',invoiceNo:'',custPO:'',invoiceDate:'',shipVia:'',terms:'',
-         items:[],subtotal:0,tax:0,misc:0,shipping:0,paidWithOrder:0,balanceDue:0,
-         warnings:['This vendor has no parser yet — header figures only, no line items. Fill in the rest yourself.']};
-  var all='',i,m;
-  for(i=0;i<rows.length;i++) all+=rows[i].text+'\n';
-  m=all.match(/(?:INVOICE|INV)\s*(?:NO\.?|#|NUMBER)?\s*:?\s*([A-Z0-9\-]{4,})/i);  if(m) o.invoiceNo=m[1];
-  m=all.match(/(?:CUST(?:OMER)?\.?\s*)?P\.?\s*O\.?\s*(?:NO\.?|#|NUMBER)?\s*:?\s*([A-Z0-9\-\s]{3,20})/i); if(m) o.custPO=m[1].replace(/^\s+|\s+$/g,'');
-  m=all.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);                                     if(m) o.invoiceDate=m[1];
-  m=all.match(/SUB\s*TOTAL\s*:?\s*\$?([\d,]+\.\d{2})/i);                          if(m) o.subtotal=poImpNum(m[1]);
-  m=all.match(/(?:FREIGHT|SHIPPING)\s*:?\s*\$?([\d,]+\.\d{2})/i);                 if(m) o.shipping=poImpNum(m[1]);
-  m=all.match(/\bTAX\s*:?\s*\$?([\d,]+\.\d{2})/i);                                if(m) o.tax=poImpNum(m[1]);
-  m=all.match(/BALANCE\s*DUE\s*:?\s*\$?([\d,]+\.\d{2})/i);                        if(m) o.balanceDue=poImpNum(m[1]);
+         items:[],subtotal:0,tax:0,misc:0,shipping:0,paidWithOrder:0,balanceDue:0,total:0,
+         warnings:[],parser:'generic'};
+  var i,j,m,r,t;
+  var all=''; for(i=0;i<rows.length;i++) all+=rows[i].text+'\n';
+  var flat=all.replace(/\s+/g,' ');
+
+  /* vendor: a known vendor name anywhere, else the first short line */
+  var known=(typeof PO_CACHE!=='undefined'&&PO_CACHE&&PO_CACHE.vendors)||[];
+  for(i=0;i<known.length&&!o.vendor;i++){
+    var nm=String(known[i].name||known[i]||'');
+    if(nm && flat.toUpperCase().indexOf(nm.toUpperCase())>=0) o.vendor=nm;
+  }
+  if(!o.vendor){ for(i=0;i<rows.length;i++){ t=rows[i].text.replace(/^\s+|\s+$/g,''); if(t && t.length<48 && !/INVOICE|PAGE|DATE|^\d/i.test(t)){ o.vendor=t; break; } } }
+
+  /* PO number: his own numbering shape anywhere on the page beats any label */
+  m=flat.match(/\bCJ[\s\-]*(20\d{2})[\s\-]*(\d{3})\b/i);
+  if(m) o.custPO='CJ-'+m[1]+'-'+m[2];
+  else { m=flat.match(/(?:P\.?\s*O\.?|PURCHASE\s+ORDER)\s*(?:NUMBER|NO\.?|#)?\s*:?\s*([A-Z0-9][A-Z0-9\-]{2,18})/i); if(m && !/^(NUMBER|NO|BOX)$/i.test(m[1])) o.custPO=m[1]; }
+
+  /* invoice / order numbers, date */
+  m=flat.match(/INVOICE\s*(?:NUMBER|NO\.?|#)?\s*:?\s*#?\s*([A-Z\-]{0,4}\d[A-Z0-9\-]{2,})/i); if(m) o.invoiceNo=m[1];
+  m=flat.match(/\bORDER\s*(?:NUMBER|NO\.?|#)\s*:?\s*#?\s*([A-Z\-]{0,4}\d[A-Z0-9\-]{3,})/i); if(m) o.orderNo=m[1];
+
+  /* pre-printed-form headers: a row of labels with the values on the next row, matched by x */
+  var LAB=[[/\bDATE\b/i,'invoiceDate'],[/\bINVOICE\b/i,'invoiceNo'],[/\bORDER\b/i,'orderNo'],[/\bP\.?\s*O\.?(?:\s|$|\.)|PURCHASE/i,'custPO'],[/\bSHIP/i,'shipVia'],[/\bTERMS\b/i,'terms']];
+  for(i=0;i<rows.length-1;i++){
+    var lr=poImpRuns(rows[i].cells,14), labels=[], k2;
+    for(j=0;j<lr.length;j++){ if(/\d/.test(lr[j].s) || lr[j].s.length>28) { labels=[]; break; }
+      for(k2=0;k2<LAB.length;k2++) if(LAB[k2][0].test(lr[j].s)){ labels.push({key:LAB[k2][1],cx:(lr[j].x+lr[j].x1)/2}); break; } }
+    if(labels.length<2) continue;
+    var vr=null; for(j=i+1;j<rows.length&&j<=i+3;j++){ if(rows[j].text.replace(/\s/g,'')){ vr=rows[j]; break; } }
+    if(!vr) continue;
+    var vrun=poImpRuns(vr.cells,9), got={};
+    for(j=0;j<vrun.length;j++){
+      var vcx=(vrun[j].x+vrun[j].x1)/2, bl=null, bdist=1e9;
+      for(k2=0;k2<labels.length;k2++){ var dd=Math.abs(vcx-labels[k2].cx); if(dd<bdist){ bdist=dd; bl=labels[k2]; } }
+      if(bl && bdist<120 && !got[bl.key]){ got[bl.key]=vrun[j].s.replace(/^\s+|\s+$/g,''); }
+    }
+    if(got.invoiceNo && /\d/.test(got.invoiceNo) && !o.invoiceNo) o.invoiceNo=got.invoiceNo;
+    if(got.orderNo && /\d/.test(got.orderNo) && !o.orderNo) o.orderNo=got.orderNo;
+    if(got.custPO && !o.custPO && !/^(UPS|FEDEX|NET|CREDIT)/i.test(got.custPO)) o.custPO=got.custPO;
+    if(got.invoiceDate && !o.invoiceDate) o.invoiceDate=poImpDateUS(got.invoiceDate);
+    if(got.shipVia && !o.shipVia && /^(UPS|FEDEX|FED EX|USPS|DHL|TRUCK|WILL CALL)/i.test(got.shipVia)){
+      var tm=got.shipVia.match(/\s+(CREDIT CARD|NET\s*\d+|PREPAID|COD)\s*$/i);
+      if(tm){ if(!got.terms) got.terms=tm[1]; got.shipVia=got.shipVia.slice(0,tm.index); }
+      o.shipVia=got.shipVia;
+    }
+    if(got.terms && !o.terms && /CREDIT|NET|PREPAID|COD/i.test(got.terms)) o.terms=got.terms.toUpperCase();
+    if(o.invoiceNo) break;
+  }
+  m=flat.match(/(?:INVOICE\s+)?DATE\s*:?\s*([A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4}|\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{2}-\d{2})/i);
+  if(m && !o.invoiceDate) o.invoiceDate=poImpDateUS(m[1]);
+  if(!o.invoiceDate) o.invoiceDate=poImpDateUS(flat);
+  m=all.match(/(?:SHIP\s*VIA|SHIPPED\s*VIA|CARRIER)\s*:?\s*((?:UPS|FEDEX|FED EX|USPS|DHL|TRUCK|WILL CALL)(?: [A-Z0-9.\-]+){0,4})/i); if(m) o.shipVia=m[1];
+  m=all.match(/TERMS?\s*:?\s*(CREDIT CARD|NET\s*\d+|PREPAID|COD|DUE ON RECEIPT)/i); if(m) o.terms=m[1].toUpperCase();
+
+  /* header row: the first row whose cells name at least two of qty / desc / price / amount */
+  var H=-1, cols=[];
+  for(i=0;i<rows.length;i++){
+    var c=[], seen={}, score=0;
+    var hr=poImpRuns(rows[i].cells,12);
+    for(j=0;j<hr.length;j++){
+      var cell=hr[j], role=poImpRole(cell.s);
+      if(!role) continue;
+      c.push({role:role,x0:cell.x,x1:cell.x1});
+      if(role!=='skip' && !seen[role]){ seen[role]=1; score++; }
+    }
+    if(score>=2 && (seen.amount||seen.price)){ H=i; cols=c; break; }
+  }
+  if(H<0) o.warnings.push('Could not find the line-item columns on this invoice — totals only; add the lines yourself.');
+  /* merge a second header line (e.g. "SHIPPED" under "QUANTITY") into the same columns */
+  for(i=H+1;H>=0&&i<rows.length&&i<=H+2;i++){
+    var allRoleOrBlank=true;
+    for(j=0;j<rows[i].cells.length;j++){ if(!poImpRole(rows[i].cells[j].s)) { allRoleOrBlank=false; break; } }
+    if(allRoleOrBlank) H=i; else break;
+  }
+
+  /* totals: vertical rows "label ... 12.34", or a horizontal label row followed by a number row */
+  var T=rows.length, tot={};
+  for(i=(H<0?0:H+1);i<rows.length;i++){
+    t=rows[i].text.replace(/^\s+|\s+$/g,'');
+    m=t.match(/^([A-Za-z][A-Za-z&.\/ ]{2,34}?)\s*:?\s*\$?\s*(-?[\d,]+\.\d{2})\s*$/);
+    if(m){ var k=poImpTotKey(m[1]); if(k){ if(tot[k]==null) tot[k]=poImpMoney(m[2]); if(T===rows.length) T=i; continue; } }
+    var labs=t.split(/\s{2,}/), keys=[], allLab=labs.length>=2;
+    for(j=0;j<labs.length&&allLab;j++){ var kk=poImpTotKey(labs[j]); if(!kk||/\d\.\d{2}/.test(labs[j])) allLab=false; else keys.push(kk); }
+    if(allLab){
+      var nr=null; for(j=i+1;j<rows.length;j++){ if(rows[j].text.replace(/\s/g,'')){ nr=rows[j]; break; } }
+      var nums=nr?(nr.text.match(/-?[\d,]+\.\d{2}/g)||[]):[];
+      if(nums.length===keys.length){ for(j=0;j<keys.length;j++) if(tot[keys[j]]==null) tot[keys[j]]=poImpMoney(nums[j]); if(T===rows.length) T=i; }
+    }
+  }
+  o.subtotal=tot.subtotal||0; o.tax=tot.tax||0; o.shipping=tot.shipping||0; o.misc=tot.misc||0;
+  o.paidWithOrder=tot.paidWithOrder||0; o.balanceDue=(tot.balanceDue!=null)?tot.balanceDue:0; o.total=tot.total||0;
+  if(!o.subtotal && o.total) o.subtotal=Math.round((o.total-o.tax-o.shipping-o.misc)*100)/100;
+  if(!o.subtotal) o.warnings.push('No subtotal or total found — the line-item check cannot run.');
+  if(H<0) return o;
+
+  /* line items: every row between the header and the totals, cells mapped to columns by x */
+  function colFor(cell){
+    var cx=cell.x+((cell.x1?cell.x1-cell.x:(cell.w||cell.s.length*4.5))/2), best=null, bd=1e9, k;
+    for(k=0;k<cols.length;k++){
+      var inside=(cx>=cols[k].x0-6 && cx<=cols[k].x1+6);
+      var d=Math.abs(cx-(cols[k].x0+cols[k].x1)/2)-(inside?40:0);
+      if(d<bd){ bd=d; best=cols[k]; }
+    }
+    return (best&&bd<140)?best.role:'desc';
+  }
+  var hasQtyCol=false; for(i=0;i<cols.length;i++) if(cols[i].role==='qty') hasQtyCol=true;
+  var last=null;
+  for(i=H+1;i<T;i++){
+    r=rows[i]; t=r.text.replace(/^\s+|\s+$/g,'');
+    if(!t) continue;
+    if(poImpTotKey(t.split(/\s{2,}/)[0]) && /\d\.\d{2}\s*$/.test(t) && !/^\d/.test(t)) continue;
+    var it={qty:'',part:'',desc:'',price:'',amount:null}, descParts=[], sawNum=false;
+    var runs=poImpRuns(r.cells,12);
+    for(j=0;j<runs.length;j++){
+      var cell=runs[j], s=cell.s.replace(/^\s+|\s+$/g,''), role=colFor(cell);
+      var numeric=poImpIsMoney(s)||poImpIsQty(s)||/^[\d.,$%\-]+$/.test(s);
+      if(role==='skip' && (numeric || s.length<=4)) continue;
+      if(role==='amount' && poImpIsMoney(s)){ it.amount=poImpMoney(s); sawNum=true; continue; }
+      if(role==='price'  && poImpIsMoney(s)){ it.price=poImpMoney(s); sawNum=true; continue; }
+      if(role==='qty'    && poImpIsQty(s)){ it.qty=parseFloat(s); continue; }
+      if(role==='part' && !numeric){ it.part=(it.part?it.part+' ':'')+s; continue; }
+      if(j===0 && it.qty==='' && poImpIsQty(s) && role!=='amount' && role!=='price'){ it.qty=parseFloat(s); continue; }
+      if(numeric && (role==='amount'||role==='price'||role==='skip')) continue;
+      descParts.push(s);
+    }
+    it.desc=descParts.join(' ').replace(/\s+/g,' ');
+    if(it.qty==='' && !hasQtyCol){ m=it.desc.match(/^(\d+)\s+(.+)$/); if(m){ it.qty=parseInt(m[1],10); it.desc=m[2]; } }
+    if(it.amount==null && it.price!=='' && it.qty!=='') it.amount=Math.round(it.qty*it.price*100)/100;
+    if(it.amount!=null && (it.desc||it.part)){
+      if(it.price==='' && it.qty>0) it.price=Math.round(it.amount/it.qty*1000)/1000;
+      if(it.qty==='') it.qty=1;
+      o.items.push({qty:it.qty,part:it.part,desc:it.desc,price:it.price,amount:it.amount});
+      last=o.items[o.items.length-1];
+    } else if(last && !sawNum && it.qty==='' && it.desc && !/THANK|NOTE|PLEASE|TERMS|REMIT|VISIT|QUESTION|RETURN|WARRANT|CERTIF|PAGE|SIGNATURE|SHORTAGE/i.test(t)
+              && Math.abs(rows[i-1].y-r.y)<20){
+      last.desc=(last.desc+' '+it.desc).replace(/\s+/g,' ');
+    }
+  }
+  if(!o.items.length) o.warnings.push('No line items could be read.');
   return o;
 }
 
 function poImpParse(rows){
   var all='',i;
   for(i=0;i<rows.length && i<40;i++) all+=rows[i].text+'\n';
-  if(/AIRCRAFT\s+SPRUCE/i.test(all)) return poImpSpruce(rows);
-  var g=poImpGeneric(rows);
-  var m=rows.length?rows[0].text.replace(/^\s+|\s+$/g,''):'';
-  if(m && m.length<48) g.vendor=m;
-  return g;
+  if(/AIRCRAFT\s+SPRUCE/i.test(all)){ var sp=poImpSpruce(rows); sp.parser='spruce'; return sp; }
+  return poImpGeneric(rows);
 }
 
 /* ---- seed the editable review state ---- */
@@ -1814,6 +1990,7 @@ function poImpCard(){
   }
 
   var read='<div class="card pad" style="margin:0"><div class="section-title" style="margin-top:0">Read from the PDF</div>'
+    + '<div class="hint" style="margin:-6px 0 8px">'+(p.parser==='spruce'?'Aircraft Spruce parser':'Generic parser \u2014 columns matched by position; check the lines before you commit')+'</div>'
     + '<table class="tb"><tbody>'
     + poImpKV('Vendor',p.vendor)
     + poImpKV('Order no.',p.orderNo)
