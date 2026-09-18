@@ -89,9 +89,6 @@ var NAV=[
   ['entry','＋','New Transaction'],
   ['ledger','≣','General Ledger'],
   ['tbx','⧉','TBX'],
-  ['pl','▤','Income Statement'],
-  ['bs','▦','Balance Sheet'],
-  ['equity','◐','LLC Member Equity'],
   ['coa','☰','Chart of Accounts'],
   ['vendors','⚑','Vendor Rules'],
   ['po','◨','Purchase Orders'],
@@ -202,44 +199,15 @@ function printAll(){
 
 
 function vDashboard(){
-  var IS=DATA.incomeStatement, BS=DATA.balanceSheet, ST=DATA.salesTax;
-  var rev=findVal(IS,'Total Revenue'), cogs=findVal(IS,'Cost of Goods Sold'), gp=findVal(IS,'Gross Profit'),
-      net=findVal(IS,'NET INCOME / (LOSS)'); if(net==null) net=findVal(IS,'Net Income / (Loss)');
-  var assets=findVal(BS,'Total Assets'), liab=findVal(BS,'Total Liabilities'), eq=findVal(BS,'Total Equity');
-  var balchk=findVal(BS,'⚖ Balance Check (must equal $0.00)'); if(balchk==null) balchk=0;
-  var chk=findVal(BS,'Cash / VolFed Business Checking'), sav=findVal(BS,'Cash / VolFed Business Savings'),
-      ven=findVal(BS,'Venmo Business Account'), amex=findVal(BS,'AMEX Credit Card');
-  var exp=[]; for(var i=0;i<IS.length;i++){ var r=IS[i]; var elab=r.label.replace(/\s+/g,' ').trim();
-    if(r.value!=null && r.value>0 && elab!=='Cost of Goods Sold'
-       && !startsAny(r.label,['Total','Gross','NET','Net','REVENUE','COST','OPERATING','Maintenance','Parts','Interest','Other Income'])) exp.push([elab,r.value]); }
-  exp.sort(function(a,b){return b[1]-a[1];}); exp=exp.slice(0,6);
-  var maxE=exp.length?exp[0][1]:1;
-
-  return '<div class="dash-print">'+topbar('Dashboard','Live summary · pulled from your General Ledger'+(DATA.ledgerUpdated?'  ·  <span class="lupd">Ledger last updated: '+esc(DATA.ledgerUpdated)+'</span>':''))
-  +opsSection()
-  +'<div class="grid g4">'
-  +tile('navy','Total Revenue',money(rev),'YTD invoiced &amp; earned')
-  +tile('','Cost of Goods Sold',money(cogs),'Gross profit '+money(gp))
-  +tile('ok','Gross Profit',money(gp),(rev?((gp/rev*100).toFixed(1)+'% margin'):''))
-  +tile(net<0?'red':'ok','Net Income','<span class="'+(net<0?'neg':'pos')+'">'+money(net)+'</span>',net<0?'Operating at a loss YTD':'Profit YTD')
-  +'</div>'
-  +'<div class="section-title">Account balances</div><div class="grid g4">'
-  +tile('navy','VolFed Checking',money(chk),'')
-  +tile('navy','VolFed Savings',money(sav),'')
-  +tile(ven<0?'red':'navy','Venmo Balance','<span class="'+(ven<0?'neg':'')+'">'+money(ven)+'</span>','')
-  +tile('navy','AMEX Balance',(amex>0?'<span class="neg">'+money(amex)+'</span>':money(amex)),(amex<0?'credit':'owed'))
-  +'</div>'
-  +'<div class="section-title">Sales tax (TBX invoices)</div><div class="grid g2 tile-pair">'
-  +tile('red','Sales Tax Payable','<span class="neg">'+money(findVal(BS,'Sales Tax Payable'))+'</span>','running liability to the state')
-  +tile('','Owed YTD',money(ST.ytd),'')
-  +'</div>'
-  +'<div class="grid g2" style="margin-top:16px">'
-  +'<div class="card pad"><div class="section-title" style="margin:0 0 14px">Balance sheet snapshot</div><table><tbody>'
-    +row2('Total Assets',money(assets))+row2('Total Liabilities',money(liab))+row2('Total Equity',money(eq))
-    +'<tr class="tot"><td>Balance Check</td><td class="num '+(Math.abs(balchk)<0.005?'pos':'neg')+'">'+money(balchk)+'</td></tr></tbody></table></div>'
-  +'<div class="card pad"><div class="section-title" style="margin:0 0 14px">Top expenses (YTD)</div>'
-    +exp.map(function(e){return '<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px"><span>'+esc(e[0])+'</span><span style="font-variant-numeric:tabular-nums">'+money(e[1])+'</span></div><div class="bar"><span style="width:'+(e[1]/maxE*100).toFixed(0)+'%;background:linear-gradient(90deg,var(--gold),var(--red))"></span></div></div>';}).join('')
-    +'</div></div></div>';
+  var F=finBuild();
+  return topbar('Dashboard','Shop operations · financial statements · Fiscal Year 2026 · pulled live from your General Ledger'+(DATA.ledgerUpdated?'  ·  <span class="lupd">Ledger last updated: '+esc(DATA.ledgerUpdated)+'</span>':''))
+  +'<div class="fin-tools"><label class="fin-chk"><input type="checkbox" id="fin-zero"'+(FIN_SHOW_ZERO?' checked':'')+'> Show $0 accounts</label>'
+  +'<span class="hint">Each statement has its own Print button. "Print / PDF this page" prints the summary and all three statements, one per page.</span></div>'
+  +'<div class="fin-page'+(FIN_SHOW_ZERO?' show-zero':'')+'" id="fin-page">'
+  +'<div id="fin-ops">'+opsSection()+'</div>'
+  +'<div class="section-title" style="margin-top:0">Money at a glance</div>'+F.kpis
+  +'<div class="section-title">Financial statements</div>'+F.statements
+  +'</div>';
 }
 /* ---------- SHOP OPERATIONS (dashboard summary of PO / Pay / CTK) ---------- */
 /* Reads the same caches the Purchase Orders, Employee Pay and CTK pages use.
@@ -261,7 +229,7 @@ function loadDash(){
   if(!PO_CACHE)  need.push(['poGetData',      function(d){ PO_CACHE=d;  }]);
   if(!PAY_CACHE) need.push(['payGetData',     function(d){ PAY_CACHE=d; }]);
   if(!CAL_CACHE) need.push(['getCalibration', function(d){ CAL_CACHE=d; }]);
-  wireOps();
+  wireOps(); wireFin(); finOwedRefresh();
   if(!need.length) return;
   for(var i=0;i<need.length;i++)(function(fn,set){
     google.script.run
@@ -275,7 +243,7 @@ function paintOps(err){
   var el=document.getElementById('ops-cards'); if(!el) return;
   el.innerHTML=opsCards()
     +(err?'<div class="flash err" style="grid-column:1/-1;margin:0">'+esc(err.message||err)+'</div>':'');
-  wireOps();
+  wireOps(); finOwedRefresh();
 }
 
 /* whole card is a shortcut to its full page */
@@ -480,6 +448,190 @@ function vPL(){ return topbar('Income Statement','Profit &amp; Loss · Fiscal Ye
   +sheetReport(DATA.incomeStatement,'C&J AVIATION LLC — Income Statement (P&L)','For the Period Ending: Fiscal Year 2026 (Jan - Dec) · auto-calculated from the General Ledger','Amount (USD)'); }
 function vBS(){ return topbar('Balance Sheet','Assets = Liabilities + Equity · Fiscal Year 2026')
   +sheetReport(DATA.balanceSheet,'C&J AVIATION LLC — Balance Sheet','As of: Fiscal Year 2026 (Jan - Dec) · Assets = Liabilities + Equity · Balance Check must equal $0.00','Balance (USD)'); }
+
+/* ---------- DASHBOARD FINANCIALS (Income Statement + Balance Sheet + Member Equity) ---------- */
+/* Rendered inside vDashboard. Reads the same DATA.incomeStatement / DATA.balanceSheet /
+   DATA.memberEquity arrays the sheet-style views (vPL/vBS/vEquity) use, so nothing changes in
+   the spreadsheet. Each statement has its own Print button that prints just that statement on
+   one page (body.fin-print-*), and a collapse chevron remembered in localStorage. */
+var FIN_SHOW_ZERO=false, FIN_COLLAPSED={};
+try{ FIN_SHOW_ZERO=(localStorage.getItem('cj_fin_zero')==='1'); FIN_COLLAPSED=JSON.parse(localStorage.getItem('cj_fin_collapsed')||'{}')||{}; }catch(e){}
+
+function finSections(arr){
+  var secs=[], cur=null;
+  for(var i=0;i<arr.length;i++){
+    var r=arr[i], lab=String(r.label||'').replace(/\s+/g,' ').trim();
+    if(r.value==null){ cur={name:lab,items:[],totals:[]}; secs.push(cur); continue; }
+    if(!cur){ cur={name:'',items:[],totals:[]}; secs.push(cur); }
+    if(/^(Total |Gross Profit|NET INCOME|Net Income \/|⚖)/.test(lab)) cur.totals.push({label:lab,value:Number(r.value)||0});
+    else cur.items.push({label:lab,value:Number(r.value)||0});
+  }
+  return secs;
+}
+function finSec(secs,re,idx){ for(var i=0;i<secs.length;i++) if(re.test(secs[i].name)) return secs[i]; return secs[idx]||{name:'',items:[],totals:[]}; }
+function finSum(items){ var t=0; for(var i=0;i<items.length;i++) t+=items[i].value; return t; }
+function finPct(n,d){ return d?((n/d*100).toFixed(1)+'%'):''; }
+function finRows(items,opts){
+  opts=opts||{};
+  var list=items.slice();
+  if(opts.sort) list.sort(function(a,b){ return Math.abs(b.value)-Math.abs(a.value); });
+  var max=0; for(var i=0;i<list.length;i++) if(Math.abs(list[i].value)>max) max=Math.abs(list[i].value);
+  var html='';
+  for(var j=0;j<list.length;j++){
+    var it=list[j], zero=Math.abs(it.value)<0.005;
+    var w=max?Math.round(Math.abs(it.value)/max*100):0;
+    var bc=it.value<0?' r':(opts.bar||'');
+    html+='<div class="fin-row'+(zero?' zero':'')+(opts.nobar?' nb':'')+'"><div class="n">'+esc(it.label)+(opts.note&&opts.note[it.label]?'<span class="fin-pct">'+esc(opts.note[it.label])+'</span>':'')+'</div>'
+        +'<div class="fin-track">'+(zero||opts.nobar?'':'<i class="'+bc.trim()+'" style="width:'+w+'%"></i>')+'</div>'
+        +'<div class="v">'+acctMoney(it.value)+'</div></div>';
+  }
+  return html;
+}
+function finSecHead(name,total,note){ return '<div class="fin-sec"><h3>'+esc(name)+(note?'<span class="fin-pct">'+esc(note)+'</span>':'')+'</h3><div class="t">'+(total==null?'':acctMoney(total))+'</div></div>'; }
+function finSum2(label,val,cls,note){ return '<div class="fin-row '+(cls||'sum')+'"><div class="n">'+esc(label)+(note?'<span class="fin-pct">'+esc(note)+'</span>':'')+'</div><div></div><div class="v">'+acctMoney(val)+'</div></div>'; }
+function finK(n){ n=Number(n)||0; var s='$'+Math.abs(Math.round(n)).toLocaleString('en-US'); return n<0?'('+s+')':s; }
+
+function finBridge(rev,cogs,gp,opex,net){
+  var top=Math.max(rev,gp,net,0), bot=Math.min(net,0), range=(top-bot)||1;
+  function y(v){ return ((v-bot)/range*100); }
+  function bar(cls,lo,hi){ return '<div class="fin-bar '+cls+'" style="bottom:'+y(lo).toFixed(1)+'%;height:'+Math.max(0.5,(y(hi)-y(lo))).toFixed(1)+'%"></div>'; }
+  function step(cap,amt,neg,inner){ return '<div class="fin-step"><div class="col">'+inner+'</div><div class="cap">'+cap+'</div><div class="amt'+(neg?' neg':'')+'">'+amt+'</div></div>'; }
+  return '<div class="fin-bridge" style="--fin-base:'+y(0).toFixed(1)+'%">'
+    +step('Revenue',finK(rev),false,bar('tot',0,rev))
+    +step('COGS','−'+finK(cogs),true,bar('minus',Math.min(rev,gp),Math.max(rev,gp)))
+    +step('Gross Profit',finK(gp),gp<0,bar(gp<0?'minus':'tot',Math.min(0,gp),Math.max(0,gp)))
+    +step('Op. Expenses','−'+finK(opex),true,bar('minus',Math.min(gp,net),Math.max(gp,net)))
+    +step('Net Income',finK(net),net<0,bar(net<0?'minus':'tot',Math.min(0,net),Math.max(0,net)))
+    +'</div>';
+}
+
+/* "Owed out" = AMEX + sales tax payable (+ unpaid labor once payGetData has loaded) */
+function finOwedFoot(amex,sales,pay){ var p=[]; if(amex>0) p.push('AMEX '+finK(amex)); if(sales>0) p.push('sales tax '+finK(sales)); if(pay>0) p.push('payroll '+finK(pay)); return esc(p.join(' · ')||'nothing outstanding'); }
+function finOwedRefresh(){
+  var el=document.getElementById('fin-owed'); if(!el||!PAY_CACHE) return;
+  var BS=DATA.balanceSheet||[], amex=findVal(BS,'AMEX Credit Card'), sales=findVal(BS,'Sales Tax Payable');
+  var sum=PAY_CACHE.summary||[], pay=0; for(var i=0;i<sum.length;i++){ var b=Number(sum[i].balance)||0; if(b>0.005) pay+=b; }
+  el.textContent=money((amex>0?amex:0)+(sales>0?sales:0)+pay);
+  var f=document.getElementById('fin-owed-foot'); if(f) f.innerHTML=finOwedFoot(amex,sales,pay);
+}
+function finCardHead(title,meta,key){
+  return '<div class="fin-head"><div><h3>'+title+'</h3><div class="meta">'+meta+'</div></div>'
+    +'<div class="fin-hb"><button class="btn sm ghost fin-print" data-fin="'+key+'" title="Print just this statement">🖨 Print</button>'
+    +'<button class="btn sm ghost fin-tog" data-fin="'+key+'" title="Show / hide">\u25be</button></div></div>';
+}
+
+function finBuild(){
+  var IS=DATA.incomeStatement||[], BS=DATA.balanceSheet||[];
+  var isS=finSections(IS), bsS=finSections(BS);
+  var sRev=finSec(isS,/REVENUE/i,0), sCogs=finSec(isS,/COST OF GOODS/i,1), sOpx=finSec(isS,/OPERATING/i,2);
+  var rev=findVal(IS,'Total Revenue'); if(rev==null) rev=finSum(sRev.items);
+  var cogs=finSum(sCogs.items);
+  var gp=findVal(IS,'Gross Profit'); if(gp==null) gp=rev-cogs;
+  var opex=findVal(IS,'Total Operating Expenses'); if(opex==null) opex=finSum(sOpx.items);
+  var net=findVal(IS,'NET INCOME / (LOSS)'); if(net==null) net=findVal(IS,'Net Income / (Loss)'); if(net==null) net=gp-opex;
+
+  var sAss=finSec(bsS,/ASSET/i,0), sLia=finSec(bsS,/LIABILIT/i,1), sEq=finSec(bsS,/EQUITY/i,2);
+  var assets=findVal(BS,'Total Assets'); if(assets==null) assets=finSum(sAss.items);
+  var liab=findVal(BS,'Total Liabilities'); if(liab==null) liab=finSum(sLia.items);
+  var eq=findVal(BS,'Total Equity'); if(eq==null) eq=finSum(sEq.items);
+  var le=findVal(BS,'Total Liabilities + Equity'); if(le==null) le=liab+eq;
+  var chk=findVal(BS,'⚖ Balance Check (must equal $0.00)'); if(chk==null) chk=assets-le;
+  var balanced=Math.abs(chk)<0.005;
+
+  /* asset groups for the stacked bar */
+  var cash=0, ar=0, other=0, cashItems=[];
+  for(var a=0;a<sAss.items.length;a++){ var it=sAss.items[a];
+    if(/cash|checking|savings|venmo/i.test(it.label)){ cash+=it.value; cashItems.push(it.label.replace(/^Cash \/ /,'').replace(/VolFed |Business |Account/g,'').trim()); }
+    else if(/receivable/i.test(it.label)) ar+=it.value; else other+=it.value; }
+  var amex=findVal(BS,'AMEX Credit Card');
+  var sales=findVal(BS,'Sales Tax Payable');
+
+  /* revenue mix for the KPI foot */
+  var mix=[]; for(var m=0;m<sRev.items.length;m++){ var ri=sRev.items[m]; if(rev&&ri.value/rev>=0.05) mix.push(ri.label.replace(/ Income$/,'').replace(/^Maintenance /,'').replace(/ Sales$/,'')+' '+Math.round(ri.value/rev*100)+'%'); }
+
+  var owedOut=(amex>0?amex:0)+(sales>0?sales:0);
+  var kpis='<div class="grid fin-kpis" id="fin-kpis">'
+    +tile('navy','Revenue',money(rev),esc(mix.slice(0,2).join(' · ')))
+    +tile('ok','Gross Profit',money(gp),finPct(gp,rev)+' margin · OpEx '+finPct(opex,rev)+' of revenue')
+    +tile(net<0?'red':'ok','Net Income','<span class="'+(net<0?'neg':'pos')+'">'+money(net)+'</span>',net<0?'Loss YTD':'Profit YTD')
+    +tile('navy','Cash on hand',money(cash),esc(cashItems.join(' + ')))
+    +tile('','Owed to us',money(ar),'Accounts receivable')
+    +tile(owedOut>0?'warn':'','Owed out','<span class="neg" id="fin-owed">'+money(owedOut)+'</span>','<span id="fin-owed-foot">'+finOwedFoot(amex,sales,null)+'</span>')
+    +'</div>';
+
+  /* ---- Income Statement card ---- */
+  var cogsNote={}; if(sCogs.items.length===1){ var ps=0; for(var p=0;p<sRev.items.length;p++) if(/parts/i.test(sRev.items[p].label)) ps+=sRev.items[p].value; if(ps) cogsNote[sCogs.items[0].label]=finPct(cogs,ps)+' of parts sales'; }
+  var pl='<section class="card fin-card'+(FIN_COLLAPSED['pl']?' collapsed':'')+'" id="fin-pl">'
+    +'<div class="fin-phead">'+printHead('Income Statement (P&L)')+'</div>'
+    +finCardHead('Income Statement','Profit &amp; Loss · Fiscal Year 2026 (Jan – Dec) · from the General Ledger','pl')
+    +'<div class="fin-body">'
+    +finBridge(rev,cogs,gp,opex,net)
+    +finSecHead(sRev.name||'Revenue',rev)+finRows(sRev.items)
+    +finSecHead(sCogs.name||'Cost of Goods Sold',cogs)+finRows(sCogs.items,{bar:'g',note:cogsNote})
+    +finSum2('Gross Profit',gp,'sum',finPct(gp,rev))
+    +finSecHead(sOpx.name||'Operating Expenses',opex,'sorted by size')+finRows(sOpx.items,{sort:true})
+    +finSum2('Total Operating Expenses',opex,'sum')
+    +finSum2('Net Income / (Loss)',net,'net')
+    +'</div></section>';
+
+  /* ---- Balance Sheet card ---- */
+  function segs(list,cls){ var h=''; for(var i=0;i<list.length;i++){ if(list[i][1]<=0.005) continue; h+='<div class="fin-seg '+cls+(list[i][2]||'')+'" style="flex:'+Math.max(1,Math.round(list[i][1]))+'"><span>'+esc(list[i][0])+'</span><span class="num">'+finK(list[i][1])+'</span></div>'; } return h; }
+  var liabList=[]; for(var l=0;l<sLia.items.length;l++) liabList.push([sLia.items[l].label.replace(/ Credit Card$/,''),sLia.items[l].value,'']);
+  var bs='<section class="card fin-card'+(FIN_COLLAPSED['bs']?' collapsed':'')+'" id="fin-bs">'
+    +'<div class="fin-phead">'+printHead('Balance Sheet')+'</div>'
+    +finCardHead('Balance Sheet','As of today · what we own vs. what we owe','bs')
+    +'<div class="fin-body">'
+    +'<div class="fin-bsviz"><div class="fin-stack"><div class="lbl">Assets · '+finK(assets)+'</div>'+segs([['Equipment & other',other,' s-fixed'],['A/R',ar,' s-ar'],['Cash',cash,' s-cash']],'')+'</div>'
+    +'<div class="fin-stack"><div class="lbl">Liabilities + Equity · '+finK(le)+'</div>'+segs([['Equity',eq,' s-eq']].concat(liabList.map(function(x){ return [x[0],x[1],' s-liab']; })),'')+'</div></div>'
+    +'<div class="fin-balance'+(balanced?'':' bad')+'"><span>'+(balanced?'⚖ Books balance':'⚖ Books do NOT balance')+'</span><span class="num">Check = '+money(chk)+'</span></div>'
+    +finSecHead(sAss.name||'Assets',assets)+finRows(sAss.items,{bar:'g'})
+    +finSecHead(sLia.name||'Liabilities',liab)+finRows(sLia.items,{bar:'r'})
+    +finSecHead(sEq.name||"Owner's Equity",eq)+finRows(sEq.items,{nobar:true})
+    +finSum2('Total Liabilities + Equity',le,'sum')
+    +'</div></section>';
+
+  /* ---- Member Equity card (the LLC Member Equity schedule) ---- */
+  var g=DATA.memberEquity||[], head=-1;
+  for(var i=0;i<g.length;i++){ if(String(g[i][0]).indexOf('Equity Component')===0){ head=i; break; } }
+  var eqRows='', names=['Member A','Member B','Total'];
+  if(head>=0){ for(var c=1;c<4;c++){ names[c-1]=String(g[head][c]||'').replace(/\s*\n\s*/g,' ').replace(/^Member [AB]\s*\((.*)\)$/,'$1'); } }
+  for(var r=head+1;r<g.length;r++){
+    var row=g[r], l0=String(row[0]||''); if(!l0||l0.indexOf('Note:')===0) continue;
+    var isEnd=l0.indexOf('Ending')===0;
+    eqRows+='<div class="fin-eqrow'+(isEnd?' end':'')+'"><div>'+esc(l0)+'</div>';
+    for(var c2=1;c2<4;c2++){ var v=row[c2]; eqRows+='<div class="num">'+(v===''||v==null?'':acctMoney(v))+'</div>'; }
+    eqRows+='</div>';
+  }
+  var me='<section class="card fin-card'+(FIN_COLLAPSED['eq']?' collapsed':'')+'" id="fin-eq">'
+    +'<div class="fin-phead">'+printHead('Member Equity')+'</div>'
+    +finCardHead('LLC Member Equity','50 / 50 ownership · net income allocated equally per the Operating Agreement','eq')
+    +'<div class="fin-body">'
+    +(head>=0
+      ? '<div class="fin-eqhead"><div>Equity component</div><div>'+esc(names[0])+'</div><div>'+esc(names[1])+'</div><div>'+esc(names[2])+'</div></div>'+eqRows
+      : '<div class="hint">The LLC Member Equity tab has no schedule to show.</div>')
+    +'</div></section>';
+
+  return { kpis:kpis, statements:'<div class="fin-cols">'+pl+bs+'</div>'+me };
+}
+function finClearPrint(){ document.body.classList.remove('fin-print-pl','fin-print-bs','fin-print-eq'); }
+function wireFin(){
+  finClearPrint();
+  var cb=$('#fin-zero');
+  if(cb) cb.onchange=function(){ FIN_SHOW_ZERO=cb.checked; try{ localStorage.setItem('cj_fin_zero',cb.checked?'1':'0'); }catch(e){}
+    var pg=$('#fin-page'); if(pg) pg.classList.toggle('show-zero',cb.checked); };
+  var btns=document.querySelectorAll('.fin-print');
+  for(var i=0;i<btns.length;i++) btns[i].onclick=function(){
+    finClearPrint(); document.body.classList.add('fin-print-'+this.getAttribute('data-fin'));
+    setTimeout(function(){ window.print(); },30);
+  };
+  var togs=document.querySelectorAll('.fin-tog');
+  for(var t=0;t<togs.length;t++) togs[t].onclick=function(){
+    var k=this.getAttribute('data-fin'), card=document.getElementById('fin-'+k); if(!card) return;
+    card.classList.toggle('collapsed'); FIN_COLLAPSED[k]=card.classList.contains('collapsed');
+    try{ localStorage.setItem('cj_fin_collapsed',JSON.stringify(FIN_COLLAPSED)); }catch(e){}
+  };
+  if(!window.__finAfterPrint){ window.__finAfterPrint=true; window.addEventListener('afterprint',finClearPrint); }
+}
 
 
 function vEquity(){

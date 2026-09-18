@@ -575,3 +575,122 @@
   .po-pager{gap:10px}
   .po-pager .btn{padding:9px 12px}
 }
+
+
+/* ======================= Dashboard financials (IS + BS + Member Equity) ======================= */
+.fin-tools{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:-8px 0 14px}
+.fin-tools .hint{margin:0}
+.fin-chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;white-space:nowrap}
+.fin-chk input{width:auto;margin:0}
+.fin-kpis{grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px}
+.fin-kpis .tile{padding:12px 12px 12px 16px}
+.fin-kpis .tile .val.small{font-size:19px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.fin-vs{color:var(--muted);font-weight:400}
+.fin-cols{display:grid;grid-template-columns:1.15fr 1fr;gap:16px;align-items:start;margin-bottom:16px}
+.fin-card{overflow:hidden}
+.fin-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.fin-head h3{margin:0;font-size:15px;font-weight:800;color:var(--navy-d)}
+.fin-head .meta{font-size:12px;color:var(--muted);margin-top:2px}
+.fin-hb{display:flex;gap:6px;flex:none}
+.fin-head .btn.sm{padding:6px 11px;font-size:12px;white-space:nowrap}
+.fin-card.collapsed .fin-body{display:none}
+.fin-card.collapsed .fin-tog{transform:rotate(-90deg)}
+.fin-body{padding:8px 16px 14px}
+.fin-phead{display:none}
+
+/* revenue → net income bridge */
+.fin-bridge{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;height:150px;padding:8px 4px 0;margin-bottom:14px;position:relative}
+.fin-step .col:after{content:"";position:absolute;left:-25%;right:-25%;bottom:var(--fin-base,0%);border-top:1px solid #c9d2db;z-index:0}
+.fin-bar{z-index:1}
+.fin-step{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
+.fin-step .col{width:70%;position:relative;height:114px}
+.fin-bar{position:absolute;left:0;right:0;border-radius:3px}
+.fin-bar.tot{background:var(--navy)} .fin-bar.minus{background:var(--red)}
+.fin-step .cap{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:6px;text-align:center;white-space:nowrap}
+.fin-step .amt{font-size:12px;color:var(--ink);text-align:center;font-variant-numeric:tabular-nums}
+.fin-step .amt.neg{color:var(--bad)}
+
+/* account rows */
+.fin-sec{display:flex;justify-content:space-between;align-items:baseline;margin:12px 0 4px;padding-bottom:4px;border-bottom:2px solid var(--navy)}
+.fin-sec h3{margin:0;font-size:12px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--navy)}
+.fin-sec .t{font-weight:800;color:var(--navy-d);font-variant-numeric:tabular-nums}
+.fin-row{display:grid;grid-template-columns:1fr 110px 104px;gap:10px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.fin-row .n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fin-row .v{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fin-track{height:7px;border-radius:4px;background:var(--cream-d);overflow:hidden}
+.fin-track>i{display:block;height:100%;background:var(--navy);border-radius:4px}
+.fin-track>i.g{background:var(--gold-d)} .fin-track>i.r{background:var(--red)}
+.fin-row.zero{display:none} .fin-row.zero .n,.fin-row.zero .v{color:var(--muted)}
+.fin-page.show-zero .fin-row.zero{display:grid}
+.fin-row.nb .fin-track{background:transparent}
+.fin-row.sum{border-top:1px solid var(--gold-d);border-bottom:0;font-weight:700;background:#fbf6e9;margin:2px -16px 0;padding:6px 16px;color:var(--navy-d)}
+.fin-row.net{background:#eef3f7;font-weight:800;font-size:15px;margin:8px -16px 0;padding:10px 16px;border:0;color:var(--navy-d)}
+.fin-pct{font-size:11.5px;color:var(--muted);font-weight:600;margin-left:6px;text-transform:none;letter-spacing:0}
+
+/* balance sheet stack */
+.fin-bsviz{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 0 4px}
+.fin-stack{display:flex;flex-direction:column;gap:2px;height:150px}
+.fin-stack .lbl{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center;margin-bottom:4px}
+.fin-seg{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:0 10px;border-radius:4px;color:#fff;font-size:12px;font-weight:700;min-height:14px;overflow:hidden;white-space:nowrap}
+.fin-seg span{overflow:hidden;text-overflow:ellipsis} .fin-seg .num{font-weight:600;flex:none;font-variant-numeric:tabular-nums}
+.fin-seg.s-cash{background:var(--gold-d)} .fin-seg.s-ar{background:#b98a3a} .fin-seg.s-fixed{background:var(--navy)}
+.fin-seg.s-liab{background:var(--red)} .fin-seg.s-eq{background:var(--navy)}
+.fin-balance{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#dff0e4;border:1px solid #a9d6ba;border-radius:8px;padding:8px 12px;margin:6px 0 4px;font-weight:700;color:#2c7a4b}
+.fin-balance.bad{background:#fbeeeb;border-color:#e3c3bc;color:#a83c2a}
+.fin-balance .num{font-weight:600;font-variant-numeric:tabular-nums}
+
+/* member equity schedule */
+.fin-eqhead,.fin-eqrow{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.fin-eqhead{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--navy);padding-top:4px}
+.fin-eqhead div:not(:first-child),.fin-eqrow div:not(:first-child){text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fin-eqrow.end{font-weight:800;background:#eef3f7;margin:4px -16px 0;padding:10px 16px;border:0;color:var(--navy-d);font-size:14.5px}
+
+@media (max-width:1100px){ .fin-kpis{grid-template-columns:repeat(3,1fr)} }
+@media (max-width:900px){ .fin-cols{grid-template-columns:1fr} }
+@media (max-width:620px){
+  .fin-kpis{grid-template-columns:1fr 1fr !important;gap:8px}
+  .fin-row{grid-template-columns:1fr 56px 96px;gap:8px;font-size:13px}
+  .fin-step .cap{font-size:9.5px}
+  .fin-eqhead,.fin-eqrow{grid-template-columns:1.4fr 1fr 1fr 1fr;gap:5px;font-size:12px}
+  .fin-eqhead{font-size:9.5px}
+}
+
+@media print{
+  /* "Print / PDF this page": all three statements, one per page */
+  .fin-tools{display:none !important}
+  .fin-kpis{gap:6px;margin-bottom:8px;grid-template-columns:repeat(6,1fr) !important}
+  .fin-kpis .tile{padding:6px 8px 6px 12px}
+  .fin-kpis .tile .label{font-size:7.5px} .fin-kpis .tile .val.small{font-size:12px;margin-top:2px} .fin-kpis .tile .foot{font-size:7.5px;margin-top:1px}
+  .fin-cols{display:block;margin-bottom:0}
+  .fin-card{box-shadow:none;border:1px solid #bbb;break-inside:avoid}
+  .fin-card .fin-body{display:block !important}
+  #fin-pl,#fin-bs,#fin-eq{break-before:page}
+  #fin-ops .grid{gap:8px;margin-bottom:10px !important} #fin-ops .ops-card{padding:8px 10px !important} #fin-ops .ops-card>div:nth-child(2){font-size:15px !important}
+  .fin-head{padding:6px 10px} .fin-head h3{font-size:12.5px} .fin-head .meta{font-size:9px}
+  .fin-body{padding:4px 10px 8px}
+  .fin-bridge{height:110px;margin-bottom:8px} .fin-step .col{height:80px}
+  .fin-step .cap{font-size:8px;margin-top:4px} .fin-step .amt{font-size:9.5px}
+  .fin-sec{margin:7px 0 2px;padding-bottom:2px} .fin-sec h3{font-size:9.5px} .fin-sec .t{font-size:10.5px}
+  .fin-row{padding:3px 0;font-size:10.5px;grid-template-columns:1fr 90px 84px;break-inside:avoid}
+  .fin-track{height:5px}
+  .fin-row.sum{padding:3px 10px;margin:1px -10px 0} .fin-row.net{font-size:11.5px;padding:5px 10px;margin:5px -10px 0}
+  .fin-pct{font-size:8.5px}
+  .fin-bsviz{padding:4px 0 2px} .fin-stack{height:110px} .fin-stack .lbl{font-size:8.5px} .fin-seg{font-size:9px;min-height:10px;padding:0 6px}
+  .fin-balance{padding:4px 8px;font-size:10px;margin:4px 0 2px}
+  .fin-eqhead,.fin-eqrow{padding:3px 0;font-size:10px} .fin-eqhead{font-size:8.5px} .fin-eqrow.end{font-size:11px;padding:5px 10px;margin:3px -10px 0}
+  .fin-bar,.fin-track>i,.fin-seg,.fin-row.sum,.fin-row.net,.fin-eqrow.end,.fin-balance{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  /* per-statement print: only the chosen card, with its own header */
+  body.fin-print-pl #content>.print-head,body.fin-print-bs #content>.print-head,body.fin-print-eq #content>.print-head,
+  body.fin-print-pl .topbar,body.fin-print-bs .topbar,body.fin-print-eq .topbar,
+  body.fin-print-pl .fin-kpis,body.fin-print-bs .fin-kpis,body.fin-print-eq .fin-kpis,
+  body.fin-print-pl #fin-ops,body.fin-print-bs #fin-ops,body.fin-print-eq #fin-ops,
+  body.fin-print-pl .section-title,body.fin-print-bs .section-title,body.fin-print-eq .section-title{display:none !important}
+  body.fin-print-pl #fin-bs,body.fin-print-pl #fin-eq,
+  body.fin-print-bs #fin-pl,body.fin-print-bs #fin-eq,
+  body.fin-print-eq #fin-pl,body.fin-print-eq #fin-bs{display:none !important}
+  body.fin-print-pl #fin-pl,body.fin-print-bs #fin-bs,body.fin-print-eq #fin-eq{break-before:auto;border:0}
+  body.fin-print-pl #fin-pl .fin-phead,body.fin-print-bs #fin-bs .fin-phead,body.fin-print-eq #fin-eq .fin-phead{display:block;padding:0 0 4px}
+  body.fin-print-pl .fin-head,body.fin-print-bs .fin-head,body.fin-print-eq .fin-head{padding:4px 0 6px;border-bottom:0}
+  body.fin-print-pl .fin-body,body.fin-print-bs .fin-body,body.fin-print-eq .fin-body{padding:0}
+  body.fin-print-pl .fin-row.sum,body.fin-print-pl .fin-row.net,body.fin-print-bs .fin-row.sum,body.fin-print-eq .fin-eqrow.end{margin-left:0;margin-right:0;padding-left:8px;padding-right:8px}
+}
