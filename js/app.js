@@ -3409,7 +3409,7 @@ function mlCsvParse(text){
   if(cell!==''||row.length){ row.push(cell); rows.push(row); }
   return rows;
 }
-function mlMonthLabel(m){ var p=String(m||'').split('-'); if(p.length<2) return m; var names=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return names[parseInt(p[1],10)-1]+' '+p[0]; }
+function mlMonthLabel(m){ var p=String(m||'').match(/^(\d{4})-(\d{2})/); var names=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; if(!p||!names[parseInt(p[2],10)-1]) return String(m||''); return names[parseInt(p[2],10)-1]+' '+p[1]; }
 function mlR1(n){ return Math.round(Number(n)*10)/10; }
 
 /* Turn a MileIQ export into one month record. Throws a readable error. */
