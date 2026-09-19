@@ -128,9 +128,9 @@
   .acct-sel:hover{border-color:var(--navy-l)}
   .rev-sel{border-color:var(--red)}
 
-  .tb th .fbtn{border:0;background:transparent;color:#9fb3cc;cursor:pointer;font-size:11px;margin-left:5px;padding:0 3px;border-radius:4px;line-height:1}
-  .tb th .fbtn:hover{background:rgba(255,255,255,.15);color:#fff}
-  .tb th .fbtn.active{color:var(--gold)}
+  .tb th .fbtn{border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.08);color:#dbe5f0;cursor:pointer;font-size:15px;margin-left:7px;padding:2px 8px;border-radius:6px;line-height:1;vertical-align:middle}
+  .tb th .fbtn:hover{background:rgba(255,255,255,.22);border-color:#fff;color:#fff}
+  .tb th .fbtn.active{color:var(--gold);border-color:var(--gold);background:rgba(233,185,122,.18)}
   .tb th.filtered{background:#24405e}
   .fpop{position:fixed;z-index:1000;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 34px rgba(0,0,0,.28);width:270px;padding:10px;font-size:13px}
   .fpop .fsort{display:flex;flex-direction:column;gap:2px;margin-bottom:8px;border-bottom:1px solid var(--line);padding-bottom:8px}
