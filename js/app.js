@@ -146,6 +146,7 @@ function buildShell(){
 var VIEWS={dashboard:vDashboard,entry:vEntry,ledger:vLedger,tbx:vTBX,pl:vPL,bs:vBS,equity:vEquity,coa:vCOA,vendors:vVendors,po:vPO,pay:vPay,cal:vCal,venmo:vVenmo,mr:vMR};
 function render(v){
   if(current && current!==v && !RENDER_BACK) VIEW_HIST.push(current);
+  if(v==='ledger' && current!=='ledger') glDefaultSort();
   current=v;
   if(location.hash!=='#'+v){ try{ history.replaceState(null,'','#'+v); }catch(e){ location.hash=v; } }
   var mainEl=document.querySelector('.main');
@@ -741,7 +742,10 @@ var GL_DEF=[
   {key:'entryCheck',label:'Entry Check'},
   {key:'status',label:'Status'}
 ];
-var GL_FILTERS={}, GL_SORT={key:null,dir:1};
+var GL_FILTERS={}, GL_SORT={key:'date',dir:1};
+/* The ledger always opens sorted by date (oldest first), no matter how it was last sorted
+   or where a late-added row sits in the sheet. Column sorts still work within a visit. */
+function glDefaultSort(){ GL_SORT={key:'date',dir:1}; }
 function glDef(k){ for(var i=0;i<GL_DEF.length;i++) if(GL_DEF[i].key===k) return GL_DEF[i]; return null; }
 function cellStr(r,k){ var d=glDef(k); var v=r[k]; if(d&&d.num) return (v!=null?money(v):''); return String(v==null?'':v); }
 function isReview(r){ return r.account==='REVIEW' && r.lineType==='Category'; }
@@ -785,8 +789,12 @@ function ledgerRows(){
   rows=rows.filter(function(r){ for(var k in GL_FILTERS){ var a=GL_FILTERS[k]; if(!a) continue; if(!a[cellStr(r,k)]) return false; } return true; });
   if(GL_SORT.key){ var k=GL_SORT.key,dir=GL_SORT.dir,d=glDef(k);
     rows.sort(function(a,b){
-      if(d&&d.num){ var av=a[k]==null?-Infinity:a[k], bv=b[k]==null?-Infinity:b[k]; return (av-bv)*dir; }
-      var as=cellStr(a,k).toLowerCase(), bs=cellStr(b,k).toLowerCase(); return as<bs?-dir:as>bs?dir:0;
+      var c=0;
+      if(k==='date'){ var ad=glDateISO(a.date), bd=glDateISO(b.date); if(!ad!==!bd) return ad?-1:1; c=ad<bd?-1:ad>bd?1:0; } /* blank/odd dates always sink */
+      else if(d&&d.num){ var av=a[k]==null?-Infinity:a[k], bv=b[k]==null?-Infinity:b[k]; c=av<bv?-1:av>bv?1:0; }
+      else { var as=cellStr(a,k).toLowerCase(), bs=cellStr(b,k).toLowerCase(); c=as<bs?-1:as>bs?1:0; }
+      if(c) return c*dir;
+      return (a.rowNum||0)-(b.rowNum||0); /* tie: keep sheet order so a transaction's lines stay together */
     });
   }
   return rows;
