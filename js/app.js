@@ -95,9 +95,10 @@ var NAV=[
   ['pay','$','Payroll'],
   ['cal','🔧','CTK'],
   ['venmo','％','Venmo Fee'],
+  ['mileage','⛟','Mileage'],
   ['mr','✎','Missing Receipt']
 ];
-var VIEW_TITLE={dashboard:'Dashboard',entry:'New Transaction',ledger:'General Ledger',tbx:'TBX Invoice Summary',pl:'Income Statement (P&L)',bs:'Balance Sheet',equity:'Member Equity',coa:'Chart of Accounts',vendors:'Vendor Rules',po:'Purchase Orders',pay:'Payroll',cal:'CTK — Calibrated Tool Kit',venmo:'Venmo Fee Calculator',mr:'Missing Receipt Affidavit'};
+var VIEW_TITLE={dashboard:'Dashboard',entry:'New Transaction',ledger:'General Ledger',tbx:'TBX Invoice Summary',pl:'Income Statement (P&L)',bs:'Balance Sheet',equity:'Member Equity',coa:'Chart of Accounts',vendors:'Vendor Rules',po:'Purchase Orders',pay:'Payroll',cal:'CTK — Calibrated Tool Kit',venmo:'Venmo Fee Calculator',mileage:'Mileage Log',mr:'Missing Receipt Affidavit'};
 
 var SIDE_NARROW=false;
 try{ SIDE_NARROW = (localStorage.getItem('cj_side')==='1'); }catch(e){}
@@ -143,7 +144,7 @@ function buildShell(){
 }
 
 
-var VIEWS={dashboard:vDashboard,entry:vEntry,ledger:vLedger,tbx:vTBX,pl:vPL,bs:vBS,equity:vEquity,coa:vCOA,vendors:vVendors,po:vPO,pay:vPay,cal:vCal,venmo:vVenmo,mr:vMR};
+var VIEWS={dashboard:vDashboard,entry:vEntry,ledger:vLedger,tbx:vTBX,pl:vPL,bs:vBS,equity:vEquity,coa:vCOA,vendors:vVendors,po:vPO,pay:vPay,cal:vCal,venmo:vVenmo,mileage:vMileage,mr:vMR};
 function render(v){
   if(current && current!==v && !RENDER_BACK) VIEW_HIST.push(current);
   if(v==='ledger' && current!=='ledger') glDefaultSort();
@@ -164,6 +165,7 @@ function render(v){
   if(v==='cal') loadCal();
   if(v==='po') loadPO();
   if(v==='pay') loadPay();
+  if(v==='mileage') loadMileage();
   if(v==='venmo') wireVenmo();
   if(v==='mr') wireMR();
   updateBar();
@@ -3382,4 +3384,179 @@ function wireMR(){
   };
   window.onbeforeprint=function(){ if(current==='mr'){ mrBuildDoc(); document.body.classList.add('mr-only'); } };
   window.onafterprint=function(){ document.body.classList.remove('mr-only'); };
+}
+
+/* =====================================================================
+   MILEAGE — monthly MileIQ log  (site 1.3.0)
+   The MileIQ CSV is parsed here in the browser; only the month's totals
+   and the raw file go to the server (Mileage.gs). Nothing reaches the
+   General Ledger until Post is pressed for a month.
+   ===================================================================== */
+var ML_LIST=null, ML_FOLDER='', ML_REVIEW=null, ML_POST=null, ML_BUSY=false, ML_MSG=null;
+var ML_DEFAULT_CREDIT='Due to Member – Joel';
+
+/* Small CSV parser: quotes, doubled quotes, commas inside quotes, CRLF. */
+function mlCsvParse(text){
+  var rows=[], row=[], cell='', q=false, i, c;
+  text=String(text||'').replace(/^﻿/,'');
+  for(i=0;i<text.length;i++){ c=text.charAt(i);
+    if(q){ if(c==='"'){ if(text.charAt(i+1)==='"'){ cell+='"'; i++; } else q=false; } else cell+=c; }
+    else if(c==='"') q=true;
+    else if(c===','){ row.push(cell); cell=''; }
+    else if(c==='\n'||c==='\r'){ if(c==='\r'&&text.charAt(i+1)==='\n') i++; row.push(cell); rows.push(row); row=[]; cell=''; }
+    else cell+=c;
+  }
+  if(cell!==''||row.length){ row.push(cell); rows.push(row); }
+  return rows;
+}
+function mlMonthLabel(m){ var p=String(m||'').split('-'); if(p.length<2) return m; var names=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return names[parseInt(p[1],10)-1]+' '+p[0]; }
+function mlR1(n){ return Math.round(Number(n)*10)/10; }
+
+/* Turn a MileIQ export into one month record. Throws a readable error. */
+function mlParseMileIQ(text, fileName){
+  var rows=mlCsvParse(text);
+  var rate=0, hdr=-1, i;
+  for(i=0;i<rows.length;i++){
+    var r=rows[i];
+    if(r[0]&&/^rates/i.test(r[0])){ for(var k=1;k<r.length-1;k++){ if(/^business/i.test(r[k])){ rate=parseFloat(r[k+1]); break; } } }
+    if(r[0]&&/^START_DATE/i.test(r[0])){ hdr=i; break; }
+  }
+  if(hdr<0) throw new Error('This does not look like a MileIQ export — no START_DATE column found.');
+  var H={}; rows[hdr].forEach(function(h,idx){ H[String(h).replace(/\*/g,'').trim().toUpperCase()]=idx; });
+  var need=['START_DATE','CATEGORY','MILES','VEHICLE','PURPOSE'];
+  for(i=0;i<need.length;i++) if(H[need[i]]==null) throw new Error('MileIQ file is missing the '+need[i]+' column.');
+  var months={}, biz=0, bizN=0, pers=0, comm=0, tot=0, veh={}, drives=0, rowRate=0;
+  for(i=hdr+1;i<rows.length;i++){
+    var d=rows[i]; if(!d[H.START_DATE]||!/^\d\d\/\d\d\/\d{4}/.test(d[H.START_DATE])) continue;
+    var mi=parseFloat(d[H.MILES]); if(isNaN(mi)) continue;
+    var mm=d[H.START_DATE].slice(6,10)+'-'+d[H.START_DATE].slice(0,2);
+    months[mm]=(months[mm]||0)+1; drives++; tot+=mi;
+    var cat=String(d[H.CATEGORY]||'').trim().toLowerCase();
+    var purpose=String(d[H.PURPOSE]||'').trim().toLowerCase();
+    if(cat==='business'){ biz+=mi; bizN++; var v=String(d[H.VEHICLE]||'').trim()||'(no vehicle)'; veh[v]=(veh[v]||0)+mi; if(H.RATE!=null){ var rr=parseFloat(d[H.RATE]); if(rr>0) rowRate=rr; } }
+    else { pers+=mi; if(purpose==='commute') comm+=mi; }
+  }
+  if(!drives) throw new Error('No drives found in that file.');
+  if(!(rate>0)) rate=rowRate;
+  if(!(rate>0)) throw new Error('No business mileage rate found in the file.');
+  var best='', bestN=0, mk=Object.keys(months), mixed=[];
+  for(i=0;i<mk.length;i++){ if(months[mk[i]]>bestN){ best=mk[i]; bestN=months[mk[i]]; } }
+  for(i=0;i<mk.length;i++) if(mk[i]!==best) mixed.push(mlMonthLabel(mk[i])+' ('+months[mk[i]]+')');
+  var vlist=Object.keys(veh).map(function(k){ return k+' '+mlR1(veh[k]); });
+  return { month:best, businessMiles:mlR1(biz), businessDrives:bizN, personalMiles:mlR1(pers), commuteMiles:mlR1(comm),
+           totalMiles:mlR1(tot), rate:rate, amount:Math.round(biz*rate*100)/100, vehicles:vlist.join(' · '),
+           drives:drives, fileName:fileName||'', warn: mixed.length?('Also contains drives from '+mixed.join(', ')+' — only the file’s main month is used.'):'' };
+}
+
+function mlFlash(kind,msg){ ML_MSG=msg?{kind:kind,msg:msg}:null; var el=document.getElementById('ml-flash'); if(el) el.innerHTML=ML_MSG?'<div class="flash '+ML_MSG.kind+'">'+(ML_MSG.kind==='ok'?'✓ ':'')+esc(ML_MSG.msg)+'</div>':''; }
+
+function vMileage(){
+  var top=topbar('Mileage','MileIQ monthly log · business miles × IRS rate · nothing posts to the ledger until you press Post');
+  if(!ML_LIST) return top+'<div id="ml-flash"></div><div class="card"><div class="miniload"><div class="spin"></div>Loading the mileage log…</div></div>';
+  return top+'<div id="ml-flash"></div>'+mlTopRow()+mlTable();
+}
+function mlTopRow(){
+  var drop='<div class="card pad ml-add"><div class="section-title" style="margin-top:0">Add a month</div>'
+    +'<label class="ml-drop" id="ml-drop"><input type="file" id="ml-file" accept=".csv,text/csv" style="display:none">'
+    +(ML_BUSY?'<div class="miniload"><div class="spin"></div>Working…</div>':'<div><strong>Drop the MileIQ CSV here</strong><br><span class="hint">or tap to choose a file</span></div>')
+    +'</label>'
+    +'<div class="hint" style="margin-top:8px">Export the month from MileIQ as CSV. The file is filed in Drive › <a href="'+esc(ML_FOLDER)+'" target="_blank" rel="noopener">Milage Tracker</a> as the month’s backup.</div></div>';
+  var rev='';
+  if(ML_REVIEW){ var r=ML_REVIEW, exists=mlFind(r.month);
+    rev='<div class="card pad ml-review"><div class="section-title" style="margin-top:0">Review · '+esc(mlMonthLabel(r.month))+'</div>'
+      +'<div class="grid g3 ml-tiles">'
+      +tile('navy','Business miles',mlR1(r.businessMiles),r.businessDrives+' drives')
+      +tile('','Rate','$'+r.rate,'from the MileIQ file')
+      +tile('ok','Value',money(r.amount),'miles × rate')
+      +'</div>'
+      +'<div class="hint">'+esc(r.vehicles)+'<br>Personal '+mlR1(r.personalMiles)+' mi (incl. commute '+mlR1(r.commuteMiles)+') — not counted · '+r.drives+' drives total · '+esc(r.fileName)+'</div>'
+      +(r.warn?'<div class="flash err" style="margin-top:8px">'+esc(r.warn)+'</div>':'')
+      +(exists?'<div class="flash '+(exists.postedTxn?'err':'busy')+'" style="margin-top:8px">'+(exists.postedTxn?esc(mlMonthLabel(r.month))+' is already posted to the ledger and cannot be replaced.':esc(mlMonthLabel(r.month))+' is already in the log — saving will replace its numbers and file the new CSV.')+'</div>':'')
+      +'<div style="display:flex;gap:8px;margin-top:12px"><button class="btn sm" id="ml-save"'+((exists&&exists.postedTxn)||ML_BUSY?' disabled':'')+'>'+(exists?'Replace month':'Save month')+'</button><button class="btn sm ghost" id="ml-cancel">Cancel</button></div></div>';
+  } else if(ML_POST){ rev=mlPostPanel(); }
+  return '<div class="grid g2 ml-top">'+drop+rev+'</div>';
+}
+function mlFind(month){ for(var i=0;i<ML_LIST.length;i++) if(ML_LIST[i].month===month) return ML_LIST[i]; return null; }
+function mlCreditOptions(sel){
+  var A=(DATA&&DATA.accounts)||[], h='', groups={}, order=[], i;
+  for(i=0;i<A.length;i++){ var a=A[i]; if(a.archived) continue; if(/^(Expense|Income)$/i.test(a.type)) continue; if(!/^\d/.test(a.code||'')) continue;
+    var t=a.type||'Other'; if(!groups[t]){ groups[t]=[]; order.push(t); } groups[t].push(a); }
+  for(i=0;i<order.length;i++){ h+='<optgroup label="'+esc(order[i])+'">'; var it=groups[order[i]];
+    for(var k=0;k<it.length;k++) h+='<option value="'+esc(it[k].name)+'"'+(it[k].name===sel?' selected':'')+'>'+esc(it[k].code+' '+it[k].name)+'</option>'; h+='</optgroup>'; }
+  return h;
+}
+function mlPostPanel(){
+  var m=mlFind(ML_POST); if(!m) return '';
+  var hasDefault=false, A=(DATA&&DATA.accounts)||[]; for(var i=0;i<A.length;i++) if(A[i].name===ML_DEFAULT_CREDIT&&!A[i].archived) hasDefault=true;
+  return '<div class="card pad ml-review"><div class="section-title" style="margin-top:0">Post '+esc(mlMonthLabel(m.month))+' to the ledger</div>'
+    +'<div class="hint">One entry dated the last day of the month:<br><b>Dr</b> Joel’s Vehicle Expenses '+money(m.amount)+' &nbsp;·&nbsp; <b>Cr</b> the account below '+money(m.amount)+'</div>'
+    +'<div class="form-row" style="margin-top:10px"><label>Credit account</label><select id="ml-credit">'+mlCreditOptions(hasDefault?ML_DEFAULT_CREDIT:'')+'</select></div>'
+    +(hasDefault?'':'<div class="flash busy" style="margin-top:8px">Tip: add a Liability account named “'+esc(ML_DEFAULT_CREDIT)+'” on the Chart of Accounts tab if you want to accrue it rather than pay it now.</div>')
+    +'<div style="display:flex;gap:8px;margin-top:12px"><button class="btn sm" id="ml-post-go"'+(ML_BUSY?' disabled':'')+'>Post entry</button><button class="btn sm ghost" id="ml-post-cancel">Cancel</button></div></div>';
+}
+function mlTable(){
+  var L=ML_LIST, h='', tb=0, ta=0, i, unposted=0;
+  for(i=0;i<L.length;i++){ var m=L[i]; tb+=m.businessMiles; ta+=m.amount; if(!m.postedTxn) unposted++;
+    h+='<tr><td style="white-space:nowrap">'+esc(mlMonthLabel(m.month))+'</td><td class="num">'+mlR1(m.businessMiles)+'</td><td class="num">'+m.businessDrives+'</td><td class="num">$'+m.rate+'</td><td class="num">'+money(m.amount)+'</td>'
+      +'<td>'+(m.fileUrl?'<a href="'+esc(m.fileUrl)+'" target="_blank" rel="noopener" title="'+esc(m.fileName)+'">CSV</a>':'<span class="hint">—</span>')+'</td>'
+      +'<td>'+(m.postedTxn?'<span class="chip ok" title="'+esc(m.postedTxn)+'">Posted '+esc(m.postedOn)+'</span>':'<span class="chip">Not posted</span>')+'</td>'
+      +'<td style="white-space:nowrap">'+(m.postedTxn?'':'<button class="btn ghost" style="padding:3px 8px;font-size:11px" data-mlpost="'+esc(m.month)+'">Post</button> <button class="btn ghost" style="padding:3px 8px;font-size:11px" data-mldel="'+esc(m.month)+'" title="Remove this month from the log">✕</button>')+'</td></tr>';
+  }
+  if(!L.length) h='<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--muted)">No months logged yet. Drop a MileIQ CSV above to start.</td></tr>';
+  var foot='<tr class="ml-total"><td>'+(L.length?L[L.length-1].month.slice(0,4)+' to date':'')+'</td><td class="num">'+mlR1(tb)+'</td><td></td><td></td><td class="num">'+money(ta)+'</td><td colspan="3" class="hint">'+(unposted?unposted+' month'+(unposted>1?'s':'')+' not posted':'')+'</td></tr>';
+  return '<div class="card scroll"><table class="tb ml-tbl"><thead><tr><th>Month</th><th class="num">Business mi</th><th class="num">Drives</th><th class="num">Rate</th><th class="num">Amount</th><th>File</th><th>Ledger</th><th></th></tr></thead><tbody>'+h+foot+'</tbody></table></div>'
+    +'<div class="hint" style="margin:10px 4px">Year end: keep the annual MileIQ PDF with the tax file. Post each month (or all of them at once at tax time) once the truck’s treatment is settled with the CPA. Posting one month never changes another.</div>';
+}
+function paintMileage(){ if(current==='mileage'){ render('mileage'); if(ML_MSG) mlFlash(ML_MSG.kind,ML_MSG.msg); } }
+function loadMileage(){
+  if(ML_LIST){ wireMileage(); return; }
+  google.script.run.withSuccessHandler(function(d){ ML_LIST=d.months||[]; ML_FOLDER=d.folderUrl||''; paintMileage(); })
+    .withFailureHandler(function(e){ if(current==='mileage'){ var ml=$('#content .miniload'); if(ml) ml.innerHTML='Could not load the mileage log: '+esc(e.message||e); } })
+    .mileageGet();
+}
+function mlOnFile(file){
+  if(!file) return;
+  if(!/\.csv$/i.test(file.name)){ mlFlash('err','That is not a CSV file. Export the month from MileIQ as CSV.'); return; }
+  var fr=new FileReader();
+  fr.onload=function(){
+    try{ var rec=mlParseMileIQ(fr.result, file.name); rec._b64=btoa(unescape(encodeURIComponent(fr.result))); ML_REVIEW=rec; ML_POST=null; ML_MSG=null; paintMileage(); }
+    catch(err){ mlFlash('err',err.message||String(err)); }
+  };
+  fr.onerror=function(){ mlFlash('err','Could not read that file.'); };
+  fr.readAsText(file);
+}
+function wireMileage(){
+  var inp=document.getElementById('ml-file'), drop=document.getElementById('ml-drop');
+  if(inp) inp.onchange=function(){ mlOnFile(this.files&&this.files[0]); this.value=''; };
+  if(drop){
+    drop.ondragover=function(e){ e.preventDefault(); drop.classList.add('over'); };
+    drop.ondragleave=function(){ drop.classList.remove('over'); };
+    drop.ondrop=function(e){ e.preventDefault(); drop.classList.remove('over'); var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; mlOnFile(f); };
+  }
+  var sv=document.getElementById('ml-save'); if(sv) sv.onclick=function(){
+    var r=ML_REVIEW; if(!r||ML_BUSY) return; ML_BUSY=true; paintMileage();
+    var rec={month:r.month,businessMiles:r.businessMiles,businessDrives:r.businessDrives,personalMiles:r.personalMiles,commuteMiles:r.commuteMiles,totalMiles:r.totalMiles,rate:r.rate,vehicles:r.vehicles,notes:r.warn||''};
+    google.script.run.withSuccessHandler(function(d){ ML_LIST=d.months||[]; ML_FOLDER=d.folderUrl||ML_FOLDER; ML_BUSY=false; ML_REVIEW=null; ML_MSG={kind:'ok',msg:mlMonthLabel(rec.month)+' saved — '+rec.businessMiles+' business mi, '+money(r.amount)+'. CSV filed in Drive.'}; paintMileage(); })
+      .withFailureHandler(function(e){ ML_BUSY=false; ML_MSG={kind:'err',msg:e.message||String(e)}; paintMileage(); })
+      .mileageSave(rec, r._b64, r.fileName);
+  };
+  var cn=document.getElementById('ml-cancel'); if(cn) cn.onclick=function(){ ML_REVIEW=null; ML_MSG=null; paintMileage(); };
+  var ps=document.querySelectorAll('[data-mlpost]'); for(var i=0;i<ps.length;i++) ps[i].onclick=function(){ ML_POST=this.getAttribute('data-mlpost'); ML_REVIEW=null; ML_MSG=null; paintMileage(); };
+  var pc=document.getElementById('ml-post-cancel'); if(pc) pc.onclick=function(){ ML_POST=null; paintMileage(); };
+  var pg=document.getElementById('ml-post-go'); if(pg) pg.onclick=function(){
+    var month=ML_POST, sel=document.getElementById('ml-credit'), acct=sel?sel.value:''; if(!month||!acct||ML_BUSY) return;
+    if(!confirm('Post '+mlMonthLabel(month)+' to the General Ledger?\n\nDr Joel’s Vehicle Expenses / Cr '+acct)) return;
+    ML_BUSY=true; paintMileage();
+    google.script.run.withSuccessHandler(function(res){ ML_LIST=(res.list&&res.list.months)||ML_LIST; ML_BUSY=false; ML_POST=null; LEDGER_CACHE=null; ML_MSG={kind:'ok',msg:mlMonthLabel(month)+' posted — '+money(res.amount)+' ('+res.txnId+').'}; paintMileage(); glRefreshReports(); })
+      .withFailureHandler(function(e){ ML_BUSY=false; ML_MSG={kind:'err',msg:e.message||String(e)}; paintMileage(); })
+      .mileagePost(month, acct);
+  };
+  var ds=document.querySelectorAll('[data-mldel]'); for(var k=0;k<ds.length;k++) ds[k].onclick=function(){
+    var month=this.getAttribute('data-mldel'); if(ML_BUSY) return;
+    if(!confirm('Remove '+mlMonthLabel(month)+' from the mileage log? The CSV stays in Drive (renamed).')) return;
+    ML_BUSY=true; paintMileage();
+    google.script.run.withSuccessHandler(function(d){ ML_LIST=d.months||[]; ML_BUSY=false; ML_MSG={kind:'ok',msg:mlMonthLabel(month)+' removed.'}; paintMileage(); })
+      .withFailureHandler(function(e){ ML_BUSY=false; ML_MSG={kind:'err',msg:e.message||String(e)}; paintMileage(); })
+      .mileageDelete(month);
+  };
 }
