@@ -742,10 +742,10 @@ var GL_DEF=[
   {key:'entryCheck',label:'Entry Check'},
   {key:'status',label:'Status'}
 ];
-var GL_FILTERS={}, GL_SORT={key:'date',dir:1};
-/* The ledger always opens sorted by date (oldest first), no matter how it was last sorted
+var GL_FILTERS={}, GL_SORT={key:'date',dir:-1};
+/* The ledger always opens sorted by date (newest first), no matter how it was last sorted
    or where a late-added row sits in the sheet. Column sorts still work within a visit. */
-function glDefaultSort(){ GL_SORT={key:'date',dir:1}; }
+function glDefaultSort(){ GL_SORT={key:'date',dir:-1}; }
 function glDef(k){ for(var i=0;i<GL_DEF.length;i++) if(GL_DEF[i].key===k) return GL_DEF[i]; return null; }
 function cellStr(r,k){ var d=glDef(k); var v=r[k]; if(d&&d.num) return (v!=null?money(v):''); return String(v==null?'':v); }
 function isReview(r){ return r.account==='REVIEW' && r.lineType==='Category'; }
