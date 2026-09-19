@@ -2206,9 +2206,28 @@ function payClockCard_(){
   return '<div class="card pad" style="margin-bottom:18px;border-left:4px solid var(--ok)">'
     + '<div class="section-title" style="margin-top:0">'
     + '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--ok);margin-right:7px"></span>'
-    + 'On the clock now \u2014 '+c.length+'</div>'
+    + 'On the clock now \u2014 '+c.length
+    + (PAY_CLOCK_AT?'<span style="float:right;font-weight:400;font-size:11px;letter-spacing:0;text-transform:none;color:var(--muted)">live \u00b7 checked '+PAY_CLOCK_AT+'</span>':'')
+    + '</div>'
     + '<div class="scroll"><table class="tb"><tbody>'+rows+'</tbody></table></div></div>';
 }
+/* On the clock — live. Re-checks every minute while Payroll is showing and the
+   moment the tab comes back into view; redraws only the card, never the page. */
+var PAY_CLOCK_TIMER=null, PAY_CLOCK_AT='';
+function payClockStamp_(){ var d=new Date(),h=d.getHours(),m=d.getMinutes(); return (h%12||12)+':'+(m<10?'0':'')+m+(h<12?' AM':' PM'); }
+function payClockPoll_(){
+  if(!$('#pay-wrap')){ if(PAY_CLOCK_TIMER){ clearInterval(PAY_CLOCK_TIMER); PAY_CLOCK_TIMER=null; } return; }
+  google.script.run
+    .withSuccessHandler(function(rows){
+      if(!PAY_CACHE) return;
+      PAY_CACHE.onTheClock=rows||[]; PAY_CLOCK_AT=payClockStamp_();
+      var el=$('#pay-clock-wrap'); if(el) el.innerHTML=payClockCard_();
+    })
+    .withFailureHandler(function(e){ console.error('on-the-clock refresh failed', e); })
+    .payOnTheClock();
+}
+function payClockStart_(){ if(!PAY_CLOCK_TIMER) PAY_CLOCK_TIMER=setInterval(payClockPoll_, 60*1000); }
+document.addEventListener('visibilitychange', function(){ if(!document.hidden && $('#pay-wrap')) payClockPoll_(); });
 function payJobCard_(){
   var h='<div class="card pad" style="margin-bottom:18px">'
     + '<div class="section-title" style="margin-top:0">Time by work order</div>'
@@ -2394,8 +2413,9 @@ function paintPay(){
 
   var recent='<div class="grid g2" style="margin-top:6px"><div>'+payRecentTime(d.recentTime)+'</div><div>'+payRecentPay(d.recentPay)+'</div></div>';
 
-  w.innerHTML=tiles+actions+panel+payClockCard_()+summary+payWoPanel()+recent;
+  w.innerHTML=tiles+actions+panel+'<div id="pay-clock-wrap">'+payClockCard_()+'</div>'+summary+payWoPanel()+recent;
   wirePay();
+  payClockStart_();
 }
 
 function payRecentTime(rows){
