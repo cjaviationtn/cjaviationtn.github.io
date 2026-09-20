@@ -1342,6 +1342,12 @@ function loadPO(){
     .poGetData();
 }
 
+function poStatusLabel(status){ return status==='Closed/Paid'?'Closed':(status||'—'); }
+function poPaidChip(p){
+  if(p.paid) return '<span class="chip" style="background:#dcefe2;color:#256a3f;border-color:#256a3f33;font-weight:700;margin-left:6px">\u2713 Paid '+esc(poFmtDate(p.paid))+'</span>';
+  if(p.status==='Cancelled') return '';
+  return '<span class="chip" style="background:#fbf6e9;color:#8a6d1e;border-color:#8a6d1e33;margin-left:6px">Unpaid</span>';
+}
 function poChip(status){
   var map={
     'Open':['#8a6d1e','#fbf6e9'],
@@ -1351,7 +1357,7 @@ function poChip(status){
     'Cancelled':['#8a2f22','#f7e3df']
   };
   var c=map[status]||['#555','#eee'];
-  return '<span class="chip" style="background:'+c[1]+';color:'+c[0]+';border-color:'+c[0]+'33;font-weight:700">'+esc(status||'—')+'</span>';
+  return '<span class="chip" style="background:'+c[1]+';color:'+c[0]+';border-color:'+c[0]+'33;font-weight:700">'+esc(poStatusLabel(status))+'</span>';
 }
 
 function paintPO(){
@@ -1360,7 +1366,7 @@ function paintPO(){
 
   var tiles='<div class="grid g4" style="margin-bottom:6px">'
     + tile(d.openCount>0?'warn':'ok','Open POs',String(d.openCount),d.openCount>0?'awaiting parts / invoice':'all caught up')
-    + tile('navy','Outstanding',money(d.outstanding),'value of open POs')
+    + tile((d.unpaid!=null?d.unpaid:d.outstanding)>0?'warn':'navy','Unpaid',money(d.unpaid!=null?d.unpaid:d.outstanding),(d.unpaid!=null)?'money still owed':'value of open POs')
     + tile('navy','POs This Year',String(d.ytdCount),'excludes cancelled')
     + tile('navy','YTD PO Spend',money(d.ytdSpend),'ordered to date')
     + '</div>';
@@ -1420,7 +1426,7 @@ function paintPO(){
         + '<td>'+esc(p.wo)+'</td>'
         + '<td>'+esc(p.type)+'</td>'
         + '<td>'+esc(p.desc)+'</td>'
-        + '<td>'+poChip(p.status)+'</td>'
+        + '<td style="white-space:nowrap">'+poChip(p.status)+poPaidChip(p)+'</td>'
         + '<td class="num">'+(p.total!=null?money(p.total):'')+'</td>'
         + '<td style="white-space:nowrap">'+esc(poFmtDate(p.received))+'</td>'
         + '<td style="white-space:nowrap">'+esc(p.invoice)+' <button class="btn ghost" style="padding:4px 10px;font-size:12px" data-popdf="'+p.row+'">PDF</button> <button class="btn ghost" style="padding:4px 10px;font-size:12px" data-poedit="'+p.row+'">Update</button></td>'
@@ -1430,7 +1436,7 @@ function paintPO(){
 
   var table='<div class="card pad po-wrap"><div class="scroll"><table class="tb po-tbl"><thead><tr>'
     + '<th>PO #</th><th>Date</th><th>Vendor</th><th>WO / Aircraft</th><th>Type</th><th>Description</th>'
-    + '<th>Status</th><th class="num">Total</th><th>Received</th><th>Invoice / Action</th>'
+    + '<th>Status / Paid</th><th class="num">Total</th><th>Received</th><th>Invoice / Action</th>'
     + '</tr></thead><tbody>'+body+'</tbody></table></div></div>';
 
   var pager='';
@@ -1458,11 +1464,12 @@ function poFmtDate(iso){
 }
 
 function poEditRow(p){
-  var statusOpts=''; for(var i=0;i<PO_STATUSES.length;i++) statusOpts+='<option value="'+PO_STATUSES[i]+'"'+(p.status===PO_STATUSES[i]?' selected':'')+'>'+PO_STATUSES[i]+'</option>';
+  var statusOpts=''; for(var i=0;i<PO_STATUSES.length;i++) statusOpts+='<option value="'+PO_STATUSES[i]+'"'+(p.status===PO_STATUSES[i]?' selected':'')+'>'+poStatusLabel(PO_STATUSES[i])+'</option>';
   return '<tr class="rev-row"><td style="font-weight:700">'+esc(p.po)+'</td>'
     + '<td colspan="9"><div style="display:flex;flex-wrap:wrap;gap:10px;align-items:end">'
     + '<div style="min-width:150px"><label>Status</label><select class="poe-status">'+statusOpts+'</select></div>'
     + '<div style="min-width:140px"><label>Received date</label><input class="poe-received" type="date" value="'+esc(p.received||'')+'"></div>'
+    + '<div style="min-width:140px"><label>Paid date</label><input class="poe-paid" type="date" value="'+esc(p.paid||'')+'"></div>'
     + '<div style="min-width:130px"><label>Invoice #</label><input class="poe-invoice" value="'+esc(p.invoice||'')+'"></div>'
     + '<div style="min-width:120px"><label>Total</label><input class="poe-total" type="number" step="0.01" value="'+(p.total!=null?p.total:'')+'"></div>'
     + '<div style="display:flex;gap:8px"><button class="btn" data-posave="'+p.row+'">Save</button>'
@@ -1585,6 +1592,7 @@ function wirePO(){
     var payload={
       status: tr.querySelector('.poe-status').value,
       received: tr.querySelector('.poe-received').value,
+      paid: tr.querySelector('.poe-paid').value,
       invoice: tr.querySelector('.poe-invoice').value.trim(),
       total: tr.querySelector('.poe-total').value
     };
@@ -1942,9 +1950,11 @@ function poImpSeed(p){
     }
   }
   var pre=p.custPO?p.custPO:((PO_CACHE&&PO_CACHE.nextPO)||'');
+  var paidUp=(p.paidWithOrder>0 && (p.balanceDue||0)===0);
   return {parsed:p, po:pre, matchedFromInvoice:!!p.custPO,
           vendor:p.vendor||'', wo:'', type:'Customer Part', status:'Open',
           date:iso||new Date().toISOString().slice(0,10),
+          paid:paidUp?(iso||new Date().toISOString().slice(0,10)):'', paidAuto:paidUp,
           shipping:p.shipping?p.shipping.toFixed(2):'0.00',
           tax:p.tax?p.tax.toFixed(2):'0.00',
           items:p.items.slice(0), lineSum:sum};
@@ -2037,7 +2047,7 @@ function poImpCard(){
 
   var typeOpts='',statOpts='';
   for(i=0;i<PO_TYPES.length;i++) typeOpts+='<option value="'+PO_TYPES[i]+'"'+(PO_TYPES[i]===PO_IMP.type?' selected':'')+'>'+PO_TYPES[i]+'</option>';
-  for(i=0;i<PO_STATUSES.length;i++) statOpts+='<option value="'+PO_STATUSES[i]+'"'+(PO_STATUSES[i]===PO_IMP.status?' selected':'')+'>'+PO_STATUSES[i]+'</option>';
+  for(i=0;i<PO_STATUSES.length;i++) statOpts+='<option value="'+PO_STATUSES[i]+'"'+(PO_STATUSES[i]===PO_IMP.status?' selected':'')+'>'+poStatusLabel(PO_STATUSES[i])+'</option>';
 
   var form='<div class="card pad" style="margin:0"><div class="section-title" style="margin-top:0">Writes to the PO Log</div>'
     + '<div class="form-row"><div><label>PO number</label><input id="poimp-po" value="'+esc(PO_IMP.po)+'"></div>'
@@ -2048,6 +2058,9 @@ function poImpCard(){
     + '<div><label>Date</label><input id="poimp-date" type="date" value="'+esc(PO_IMP.date)+'"></div></div>'
     + '<div class="form-row"><div><label>Shipping</label><input id="poimp-ship" value="'+esc(PO_IMP.shipping)+'"></div>'
     + '<div><label>Tax</label><input id="poimp-tax" value="'+esc(PO_IMP.tax)+'"></div></div>'
+    + '<div class="form-row"><div><label>Paid date</label><input id="poimp-paid" type="date" value="'+esc(PO_IMP.paid||'')+'">'
+    +   '<div class="hint">'+(PO_IMP.paidAuto?'Invoice shows paid with order, balance due $0.00 — filled in for you.':'Leave blank if you have not paid this yet.')+'</div></div>'
+    + '<div></div></div>'
     + '</div>';
 
   var body='';
@@ -2127,7 +2140,7 @@ function poImpWire(){
   if(close) close.onclick=function(){ PO_IMP=null; PO_IMP_ERR=null; paintPO(); };
   if(!PO_IMP) return;
 
-  var f=['po','vendor','wo','type','status','date','ship','tax'];
+  var f=['po','vendor','wo','type','status','date','ship','tax','paid'];
   for(var k=0;k<f.length;k++){
     (function(name){
       var el=$('#poimp-'+name); if(!el) return;
@@ -2168,6 +2181,7 @@ function poImpWire(){
       invoice:PO_IMP.parsed.invoiceNo||'',
       shipping:$('#poimp-ship').value,
       tax:$('#poimp-tax').value,
+      paid:$('#poimp-paid').value,
       items:PO_IMP.items
     };
     commit.disabled=true; commit.textContent='Committing…';
