@@ -13,7 +13,6 @@
 <link rel="icon" type="image/png" href="img/logo.png">
 <link rel="apple-touch-icon" href="img/logo.png">
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="css/app.css">
 <script>
 /* Force https. GitHub Pages redirects http -> https, but a browser can still
  * serve a cached http copy, and Google sign-in rejects http origins outright
@@ -24,12 +23,28 @@
   }
 })();
 </script>
-<script src="config.js"></script>
+<script>
+/* Safari keeps serving cached copies of app.js / app.css even after the page reloads, so every
+ * asset URL carries the site version: a push changes the URL and every browser fetches fresh.
+ * config.js itself is fetched with a timestamp so the version it carries is always current. */
+document.write('<script src="config.js?_=' + Date.now() + '"><\/script>');
+</script>
+<script>
+(function(){
+  var v = encodeURIComponent((window.CJ_CONFIG && window.CJ_CONFIG.siteVersion) || Date.now());
+  document.write('<link rel="stylesheet" href="css/app.css?v=' + v + '">');
+})();
+</script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 <div id="root"><div class="loading"><div><div class="spin"></div>Loading…</div></div></div>
-<script src="js/api.js"></script>
-<script src="js/app.js"></script>
+<script>
+(function(){
+  var v = encodeURIComponent((window.CJ_CONFIG && window.CJ_CONFIG.siteVersion) || Date.now());
+  document.write('<script src="js/api.js?v=' + v + '"><\/script>');
+  document.write('<script src="js/app.js?v=' + v + '"><\/script>');
+})();
+</script>
 </body>
 </html>
