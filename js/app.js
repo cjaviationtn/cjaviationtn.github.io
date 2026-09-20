@@ -1368,7 +1368,7 @@ function paintPO(){
 
   var newBtn='<div class="actions"><button class="btn gold" id="po-newtoggle">＋ New Purchase Order</button>'
     + '<button class="btn ghost" id="po-import">⤒ Import invoice PDF</button>'
-    + '<input type="file" id="po-impfile" accept="application/pdf,.pdf" style="display:none">'
+    + '<input type="file" id="po-impfile" accept="application/pdf,.pdf" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">'
     + '<span class="pill">Next number: <b>'+esc(d.nextPO)+'</b></span></div>';
 
   var today=new Date().toISOString().slice(0,10);
@@ -1514,17 +1514,36 @@ function poRenderItems(){
   };
   poUpdateGrand();
 }
+function poIsIOS_(){ return /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
+function poB64Blob_(b64, type){
+  var bin=atob(b64), n=bin.length, u=new Uint8Array(n);
+  for(var i=0;i<n;i++) u[i]=bin.charCodeAt(i);
+  return new Blob([u],{type:type||'application/pdf'});
+}
 function poDownloadPdf(row, btn){
   if(btn){ btn.disabled=true; btn.textContent='…'; }
+  /* iOS Safari ignores data: downloads and blocks window.open once the tap is over, so on
+     iOS open the tab now, inside the tap, and drop the PDF into it when it comes back. */
+  var win=null;
+  if(poIsIOS_()){
+    try{ win=window.open('','_blank'); }catch(e){ win=null; }
+    if(win){ try{ win.document.write('<title>Building PDF…</title><p style="font-family:-apple-system,Helvetica,sans-serif;padding:24px;color:#2B4865">Building your PO PDF…</p>'); }catch(e){} }
+  }
   google.script.run
     .withSuccessHandler(function(res){
       if(btn){ btn.disabled=false; btn.textContent='PDF'; }
+      var url=URL.createObjectURL(poB64Blob_(res.b64,'application/pdf'));
+      if(win){ win.location.href=url; return; }
       var a=document.createElement('a');
-      a.href='data:application/pdf;base64,'+res.b64;
-      a.download=res.filename||'PO.pdf';
+      a.href=url; a.download=res.filename||'PO.pdf';
       document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(url); },60000);
     })
-    .withFailureHandler(function(e){ if(btn){ btn.disabled=false; btn.textContent='PDF'; } alert('Could not build PDF: '+(e.message||e)); })
+    .withFailureHandler(function(e){
+      if(win){ try{ win.close(); }catch(x){} }
+      if(btn){ btn.disabled=false; btn.textContent='PDF'; }
+      alert('Could not build PDF: '+(e.message||e));
+    })
     .poPdf(row);
 }
 function wirePO(){
