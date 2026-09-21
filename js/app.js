@@ -169,6 +169,7 @@ function render(v){
   if(v==='mileage') loadMileage();
   if(v==='venmo') wireVenmo();
   if(v==='mr') wireMR();
+  if(v==='bench') loadBench();
   updateBar();
 }
 /* phone: the sidebar becomes a slide-in drawer behind the ☰ in the top bar */
@@ -3184,15 +3185,37 @@ function calClick(e){
 /* =================== END CTK — CALIBRATED TOOL KIT =================== */
 
 
-/* ================= BENCH STOCK (site 1.3.6) =================
+/* ================= BENCH STOCK (site 1.3.6, no-PIN 1.3.7) =================
    The Benchstock site is its own GitHub Pages repo (cjaviationtn/benchstock), served under this
-   domain at /benchstock/ — same origin, so its PIN token in localStorage just works inside the
-   frame. Embedded, not merged: the two Apps Script projects collide on doGet/onOpen and the
-   client globals ($, esc, money, render, DATA, current). Nothing server-side here. */
+   domain at /benchstock/ — same origin as this page. Embedded, not merged: the two Apps Script
+   projects collide on doGet/onOpen and the client globals ($, esc, money, render, DATA, current).
+
+   Benchstock gates itself with a shop PIN that a device trades for a token kept in
+   localStorage under cj_bs_token. This session is already Google-verified, so instead of
+   showing that PIN screen inside the admin site we ask our own API (benchToken, API 19) for
+   the token and drop it into localStorage before the frame loads — same origin, so the frame
+   reads it. Employees opening /benchstock/ directly still get the PIN. */
 var BENCH_URL='/benchstock/';
+var BENCH_TOKEN_KEY='cj_bs_token';
+function benchStored_(){ try{ return localStorage.getItem(BENCH_TOKEN_KEY)||''; }catch(e){ return ''; } }
+function benchFrame_(){ return '<iframe class="bench-frame" id="bench-frame" src="'+BENCH_URL+'" title="Bench Stock" allow="camera"></iframe>'; }
 function vBench(){
-  return topbar('Bench Stock','Mx trailer inventory \u00b7 scan, take, reorder, labels \u00b7 <a href="'+BENCH_URL+'" target="_blank" rel="noopener">open in its own tab \u2197</a>','live \u00b7 cjaviationtn.org/benchstock')
-    +'<iframe class="bench-frame" src="'+BENCH_URL+'" title="Bench Stock" allow="camera"></iframe>';
+  return topbar('Bench Stock','Mx trailer inventory \u00b7 scan, take, reorder, labels','live \u00b7 cjaviationtn.org/benchstock')
+    +'<div id="bench-wrap">'+(benchStored_() ? benchFrame_() : '<div class="card pad miniload"><span class="spin"></span> Unlocking bench stock\u2026</div>')+'</div>';
+}
+/* Runs on every open: instant when a token is already stored, and quietly swaps in a fresh one
+   if Benchstock's token was rotated (the frame reloads with the new token). */
+function loadBench(){
+  var had=benchStored_();
+  google.script.run.withSuccessHandler(function(r){
+    var t=(r&&r.token)||''; if(!t||t===had) return;
+    try{ localStorage.setItem(BENCH_TOKEN_KEY,t); }catch(e){ console.error('bench token store',e); }
+    var w=$('#bench-wrap'); if(w && current==='bench') w.innerHTML=benchFrame_();
+  }).withFailureHandler(function(e){
+    console.error('benchToken',e);
+    var w=$('#bench-wrap'); if(w && current==='bench' && !had)
+      w.innerHTML='<div class="flash err">Could not unlock Bench Stock automatically ('+esc(e.message||String(e))+') \u2014 enter the PIN below.</div>'+benchFrame_();
+  }).benchToken();
 }
 
 /* ================= VENMO FEE CALCULATOR ================= */
