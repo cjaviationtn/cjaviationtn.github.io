@@ -92,13 +92,14 @@ var NAV=[
   ['coa','☰','Chart of Accounts'],
   ['vendors','⚑','Vendor Rules'],
   ['po','◨','Purchase Orders'],
+  ['bench','⬢','Bench Stock'],
   ['pay','$','Payroll'],
   ['cal','🔧','CTK'],
   ['venmo','％','Venmo Fee'],
   ['mileage','⛟','Mileage'],
   ['mr','✎','Missing Receipt']
 ];
-var VIEW_TITLE={dashboard:'Dashboard',entry:'New Transaction',ledger:'General Ledger',tbx:'TBX Invoice Summary',pl:'Income Statement (P&L)',bs:'Balance Sheet',equity:'Member Equity',coa:'Chart of Accounts',vendors:'Vendor Rules',po:'Purchase Orders',pay:'Payroll',cal:'CTK — Calibrated Tool Kit',venmo:'Venmo Fee Calculator',mileage:'Mileage Log',mr:'Missing Receipt Affidavit'};
+var VIEW_TITLE={dashboard:'Dashboard',entry:'New Transaction',ledger:'General Ledger',tbx:'TBX Invoice Summary',pl:'Income Statement (P&L)',bs:'Balance Sheet',equity:'Member Equity',coa:'Chart of Accounts',vendors:'Vendor Rules',po:'Purchase Orders',bench:'Bench Stock',pay:'Payroll',cal:'CTK — Calibrated Tool Kit',venmo:'Venmo Fee Calculator',mileage:'Mileage Log',mr:'Missing Receipt Affidavit'};
 
 var SIDE_NARROW=false;
 try{ SIDE_NARROW = (localStorage.getItem('cj_side')==='1'); }catch(e){}
@@ -144,18 +145,18 @@ function buildShell(){
 }
 
 
-var VIEWS={dashboard:vDashboard,entry:vEntry,ledger:vLedger,tbx:vTBX,pl:vPL,bs:vBS,equity:vEquity,coa:vCOA,vendors:vVendors,po:vPO,pay:vPay,cal:vCal,venmo:vVenmo,mileage:vMileage,mr:vMR};
+var VIEWS={dashboard:vDashboard,entry:vEntry,ledger:vLedger,tbx:vTBX,pl:vPL,bs:vBS,equity:vEquity,coa:vCOA,vendors:vVendors,po:vPO,bench:vBench,pay:vPay,cal:vCal,venmo:vVenmo,mileage:vMileage,mr:vMR};
 function render(v){
   if(current && current!==v && !RENDER_BACK) VIEW_HIST.push(current);
   if(v==='ledger' && current!=='ledger') glDefaultSort();
   current=v;
   if(location.hash!=='#'+v){ try{ history.replaceState(null,'','#'+v); }catch(e){ location.hash=v; } }
   var mainEl=document.querySelector('.main');
-  if(mainEl) mainEl.classList.toggle('wide', v==='ledger');
+  if(mainEl) mainEl.classList.toggle('wide', v==='ledger'||v==='bench');
   $('#content').innerHTML=printHead(VIEW_TITLE[v])+VIEWS[v]();
   var btns=document.querySelectorAll('#nav button');
   for(var i=0;i<btns.length;i++) btns[i].classList.toggle('active',btns[i].getAttribute('data-view')===v);
-  renderMnav(); injectPrintControls();
+  renderMnav(); if(v!=='bench') injectPrintControls();  /* bench is a frame — print from inside it */
   if(v==='dashboard') loadDash();
   if(v==='entry') wireEntry();
   if(v==='ledger') loadLedger();
@@ -3182,6 +3183,17 @@ function calClick(e){
 }
 /* =================== END CTK — CALIBRATED TOOL KIT =================== */
 
+
+/* ================= BENCH STOCK (site 1.3.6) =================
+   The Benchstock site is its own GitHub Pages repo (cjaviationtn/benchstock), served under this
+   domain at /benchstock/ — same origin, so its PIN token in localStorage just works inside the
+   frame. Embedded, not merged: the two Apps Script projects collide on doGet/onOpen and the
+   client globals ($, esc, money, render, DATA, current). Nothing server-side here. */
+var BENCH_URL='/benchstock/';
+function vBench(){
+  return topbar('Bench Stock','Mx trailer inventory \u00b7 scan, take, reorder, labels \u00b7 <a href="'+BENCH_URL+'" target="_blank" rel="noopener">open in its own tab \u2197</a>','live \u00b7 cjaviationtn.org/benchstock')
+    +'<iframe class="bench-frame" src="'+BENCH_URL+'" title="Bench Stock" allow="camera"></iframe>';
+}
 
 /* ================= VENMO FEE CALCULATOR ================= */
 var VM_FEES={
