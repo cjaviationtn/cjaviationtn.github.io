@@ -373,15 +373,8 @@ function renderManage(){
     + '   <br><br>For photos: tap the square to the left of the part number. If the part has no photo'
     + '   yet that opens the camera; if it already has one, it opens the photo full size, where you'
     + '   can replace or delete it.</div>'
-    + '</div>'
-    + '<div class="panel">'
-    + '  <h3>This device</h3>'
-    + '  <div class="psub">The site itself always loads fresh from the web — there is no pinned'
-    + '   deployment to go stale. This shows which script version is answering.</div>'
-    + '  <div id="verbox" style="font-size:13.5px">Checking…</div>'
-    + (REQUIRE_PIN ? '  <button class="btn-danger" style="margin-top:12px" onclick="BS.signOutDevice()">Sign this device out</button>' : '')
     + '</div>';
-  showVersions();
+  /* "This device" version panel removed 22 Sep 2026 — the admin site's own stamp covers it. */
 }
 
 function showVersions(){
