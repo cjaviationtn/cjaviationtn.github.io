@@ -3,11 +3,13 @@
  * googleClientId : OAuth 2.0 Web client ID that allows https://cjaviationtn.org
  * siteVersion    : bump on every push; the page refetches this file to spot a stale copy
  * apiVersion     : the Apps Script API_VERSION this site expects (bump when Api/backend changes)
- * benchApiUrl    : the Benchstock Apps Script /exec URL (Bench Stock tab; separate project, its own sheet) */
+ * benchApiUrl    : the Benchstock Apps Script /exec URL (Bench Stock tab; separate project, its own sheet)
+ * benchViaAdmin  : true = Bench Stock calls go through this site's backend (Api.gs benchCall, API 19+) */
 window.CJ_CONFIG = {
   apiUrl: 'https://script.google.com/macros/s/AKfycbwow6TV_yoeVzWN7SbEu-DugfIUfBT1NeOQpdm5ilLrMwOSA42N9H8BiEqu4vC4k3a8/exec',
   googleClientId: '211334963834-rsgqo4k7h6fto992ei6qbbpjb4cjdjcb.apps.googleusercontent.com',
-  siteVersion: 'site 1.4.2',
+  siteVersion: 'site 1.4.3',
   apiVersion: 18,
-  benchApiUrl: 'https://script.google.com/macros/s/AKfycbyC2-0r6vfV7pylr0yVHKLIwiFm8OFJMqAVVWbFJM-OwGdWgFXMuC9W3uBZRAO2N8fh/exec'
+  benchApiUrl: 'https://script.google.com/macros/s/AKfycbyC2-0r6vfV7pylr0yVHKLIwiFm8OFJMqAVVWbFJM-OwGdWgFXMuC9W3uBZRAO2N8fh/exec',
+  benchViaAdmin: false
 };

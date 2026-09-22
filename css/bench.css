@@ -222,3 +222,14 @@
   body.bench-print .main{padding:0;max-width:none}
   body.bench-print .bs .wrap{padding:0}
 }
+
+/* Labels tab: pick-from-loaded-parts suggestions */
+.bs .lsug{display:flex;flex-direction:column;gap:4px;margin:-4px 0 10px}
+.bs .lsug-item{display:flex;align-items:center;gap:8px;flex-wrap:wrap;text-align:left;background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:13.5px;color:var(--text);cursor:pointer}
+.bs .lsug-item:hover{border-color:var(--accent)}
+.bs .lsug-item.on{background:var(--okbg);border-color:#bfe3cc}
+.bs .lsug-item b{font-size:14px}
+.bs .lsug-bin{font-size:11px;font-weight:700;color:var(--muted)}
+.bs .lsug-desc{flex:1 1 200px;color:#33414f;font-size:12.5px}
+.bs .lsug-added{font-size:11px;font-weight:700;color:var(--ok)}
+.bs .lsug-none{font-size:12.5px;color:var(--muted);padding:6px 2px}

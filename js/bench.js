@@ -26,6 +26,15 @@ try { TOKEN = localStorage.getItem('cj_bs_token') || ''; } catch(e){}
    CORS request — add a Content-Type header and the browser fires a
    preflight OPTIONS that Apps Script cannot answer. */
 function call(action, args){
+  /* benchViaAdmin (config.js): send the call to the admin site's own backend (Api.gs benchCall,
+     API 19+), which forwards it to the Benchstock script with the token only it holds. That is
+     what puts the Bench Stock data behind Joel's Google sign-in. Off = call Benchstock directly. */
+  if (CJ_CONFIG.benchViaAdmin){
+    return new Promise(function(res, rej){
+      google.script.run.withSuccessHandler(res).withFailureHandler(function(e){ rej(e instanceof Error ? e : new Error(e && e.message || String(e))); })
+        .benchCall(action, args || []);
+    });
+  }
   var url = CJ_CONFIG.benchApiUrl;
   if (!url || url.indexOf('PASTE_') === 0){
     return Promise.reject(new Error('API URL is not set in config.js'));
@@ -127,6 +136,9 @@ function openApp(){
 
 /* ---- App state -------------------------------------------------------- */
 var PARTS = [];
+var CACHE_KEY = 'cj_bs_parts';
+function cacheRead_(){ try { var j = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); return (j && j.v === 1 && Array.isArray(j.parts)) ? j.parts : null; } catch(e){ return null; } }
+function cacheWrite_(parts){ try { localStorage.setItem(CACHE_KEY, JSON.stringify({ v:1, at:Date.now(), parts:parts })); } catch(e){ console.warn('parts cache', e); } }
 var modeByIdx = {};       // idx -> 'take' | 'add'
 var IMG = {};             // partNumber -> thumbnail; '' = none
 var FULL = {};            // partNumber -> full-size data URL, fetched on demand
@@ -162,14 +174,24 @@ function boot(){
   // A scanned QR label lands here as ?p=<part number>.
   INITIAL_PN = String(BS_DEEPLINK || '').replace(/["']/g,'').trim(); BS_DEEPLINK = '';
 
+  var input = document.getElementById('q');
+  input.addEventListener('input', function(){ shownLimit = 25; runSearch(input.value); });
+  if (INITIAL_PN) input.value = INITIAL_PN;
+  /* Fast path: paint the list the last visit saw (localStorage) while the sheet answers. The
+     Apps Script cold start is the 3-8 s people wait on; the numbers refresh underneath. */
+  var cached = cacheRead_();
+  if (cached && cached.length){
+    PARTS = cached;
+    sub.textContent = PARTS.length + ' parts · refreshing…';
+    switchTab('parts');
+  }
   API.getParts().then(function(parts){
     PARTS = parts || [];
+    cacheWrite_(PARTS);
     sub.textContent = PARTS.length + ' parts · record take / add below';
-    var input = document.getElementById('q');
-    input.addEventListener('input', function(){ shownLimit = 25; runSearch(input.value); });
-    if (INITIAL_PN) input.value = INITIAL_PN;
-    switchTab('parts');
+    if (cached && cached.length && curTab === 'parts') runSearch(input.value); else switchTab(curTab || 'parts');
   }).catch(function(e){
+    if (PARTS.length){ toast('Showing the last saved list — ' + (e && e.message || e), true); return; }
     console.error('Bench Stock load', e);
     view.innerHTML = '<div class="empty">Could not reach the Bench Stock sheet just now.<br>' + esc(e && e.message || e)
       + '<br><br><button class="more" style="max-width:260px" onclick="BS.mount()">Try again</button></div>';
@@ -804,10 +826,10 @@ function renderLabels(){
   renderLabelsCount();
   view.innerHTML = ''
     + '<div class="lblbar noprint">'
-    + '  <input id="lpn" type="text" list="lpnlist" placeholder="Type a part number or bin...">'
-    + '  <datalist id="lpnlist"></datalist>'
+    + '  <input id="lpn" type="text" autocomplete="off" placeholder="Type a part number, bin or description...">'
     + '  <button onclick="BS.addLabelFromInput()">Add</button>'
     + '</div>'
+    + '<div id="lsug" class="lsug noprint"></div>'
     + '<div class="lblbar noprint">'
     + '  <button onclick="BS.addAllLabels()">Add ALL parts</button>'
     + '  <button class="ghost" onclick="BS.addLowLabels()">Add low-stock only</button>'
@@ -818,13 +840,40 @@ function renderLabels(){
     + '<div class="count noprint" style="margin-bottom:10px">Scanning a label opens that part'
     + ' straight to its take/add card. Print, cut, and stick one on each bin.</div>'
     + '<div id="grid"></div>';
-  document.getElementById('lpnlist').innerHTML = PARTS.map(function(p){
-    return '<option value="' + esc(p.sprucePN) + '">'
-      + esc((p.binName ? p.binName + ' - ' : '') + (p.desc||'').slice(0,44)) + '</option>';
-  }).join('');
   var inp = document.getElementById('lpn');
-  inp.addEventListener('keydown', function(e){ if (e.key === 'Enter') addLabelFromInput(); });
+  inp.addEventListener('input', function(){ paintLabelSuggest(inp.value); });
+  inp.addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); addLabelFromInput(); } });
   paintLabels();
+}
+/* Labels are only ever for parts that exist in the sheet — no free-text codes. As you type,
+   the matching loaded parts are listed; tap one (or press Enter when the match is unambiguous). */
+function labelMatches(q){
+  q = String(q||'').trim().toLowerCase();
+  if (!q) return [];
+  var out = [];
+  for (var i=0;i<PARTS.length;i++){ var sc = searchScore(PARTS[i], q); if (sc > -1) out.push({p:PARTS[i], s:sc, i:i}); }
+  out.sort(function(a,b){ return (a.s - b.s) || (a.i - b.i); });
+  return out;
+}
+function paintLabelSuggest(q){
+  var box = document.getElementById('lsug'); if (!box) return;
+  var m = labelMatches(q);
+  if (!String(q||'').trim()){ box.innerHTML = ''; return; }
+  if (!m.length){ box.innerHTML = '<div class="lsug-none">No loaded part matches “' + esc(q) + '”</div>'; return; }
+  box.innerHTML = m.slice(0, 8).map(function(x){
+    var p = x.p, on = labelSel.indexOf(p.sprucePN) > -1;
+    return '<button type="button" class="lsug-item' + (on ? ' on' : '') + '" onclick="BS.addLabelPart(' + x.i + ')">'
+      + '<b>' + esc(p.sprucePN) + '</b>' + (p.binName ? ' <span class="lsug-bin">BIN ' + esc(p.binName) + '</span>' : '')
+      + '<span class="lsug-desc">' + esc((p.desc||'').slice(0,60)) + '</span>' + (on ? '<span class="lsug-added">added</span>' : '') + '</button>';
+  }).join('') + (m.length > 8 ? '<div class="lsug-none">' + (m.length - 8) + ' more — keep typing</div>' : '');
+}
+function addLabelPart(i){
+  var p = PARTS[i]; if (!p) return;
+  pushLabel(p.sprucePN);
+  var el = document.getElementById('lpn'); if (el){ el.value = ''; el.focus(); }
+  paintLabelSuggest('');
+  paintLabels(); renderLabelsCount();
+  toast('Label added: ' + p.sprucePN);
 }
 
 function paintLabels(){
@@ -878,11 +927,14 @@ function addLabelFromInput(){
   var el = document.getElementById('lpn');
   var v = (el.value || '').trim();
   if (!v) return;
-  var i = findIdx(v);
-  if (i > -1) v = PARTS[i].sprucePN;   // normalise a common P/N to the Spruce P/N
-  pushLabel(v);
-  el.value = '';
-  paintLabels(); renderLabelsCount();
+  var i = findIdx(v);                       // exact part number (Spruce or common P/N)
+  if (i === -1){
+    var m = labelMatches(v);
+    if (m.length === 1) i = m[0].i;         // one loaded part matches — that's the one
+    else if (m.length > 1){ toast(m.length + ' parts match — tap the one you want', true); paintLabelSuggest(v); return; }
+    else { toast('No loaded part matches ' + v, true); return; }
+  }
+  addLabelPart(i);
 }
 function addAllLabels(){ PARTS.forEach(function(p){ pushLabel(p.sprucePN); }); paintLabels(); renderLabelsCount(); }
 function addLowLabels(){ lowStockParts().forEach(function(p){ pushLabel(p.sprucePN); }); paintLabels(); renderLabelsCount(); }
@@ -1072,5 +1124,5 @@ function mount(deeplink){
 window.addEventListener('beforeprint', function(){ if (document.getElementById('bs-root')) document.body.classList.add('bench-print'); });
 window.addEventListener('afterprint',  function(){ document.body.classList.remove('bench-print'); });
 
-window.BS = { mount: mount, switchTab: switchTab, closePhoto: closePhoto, replacePhoto: replacePhoto, askDeletePhoto: askDeletePhoto, addAllLabels: addAllLabels, addBlankLabel: addBlankLabel, addLabelFromInput: addLabelFromInput, addLowLabels: addLowLabels, askDeleteCard: askDeleteCard, bumpCard: bumpCard, cancelDelete: cancelDelete, cancelDeletePhoto: cancelDeletePhoto, clearLabels: clearLabels, closeEdit: closeEdit, copyOrderList: copyOrderList, doAddPart: doAddPart, doDeleteCard: doDeleteCard, doDeletePhoto: doDeletePhoto, exportYearPdf: exportYearPdf, openEdit: openEdit, openPhoto: openPhoto, pickPhoto: pickPhoto, saveEdit: saveEdit, setModeCard: setModeCard, showMore: showMore, signOutDevice: signOutDevice, submitCard: submitCard, updLabel: updLabel, yearMore: yearMore };
+window.BS = { mount: mount, addLabelPart: addLabelPart, switchTab: switchTab, closePhoto: closePhoto, replacePhoto: replacePhoto, askDeletePhoto: askDeletePhoto, addAllLabels: addAllLabels, addBlankLabel: addBlankLabel, addLabelFromInput: addLabelFromInput, addLowLabels: addLowLabels, askDeleteCard: askDeleteCard, bumpCard: bumpCard, cancelDelete: cancelDelete, cancelDeletePhoto: cancelDeletePhoto, clearLabels: clearLabels, closeEdit: closeEdit, copyOrderList: copyOrderList, doAddPart: doAddPart, doDeleteCard: doDeleteCard, doDeletePhoto: doDeletePhoto, exportYearPdf: exportYearPdf, openEdit: openEdit, openPhoto: openPhoto, pickPhoto: pickPhoto, saveEdit: saveEdit, setModeCard: setModeCard, showMore: showMore, signOutDevice: signOutDevice, submitCard: submitCard, updLabel: updLabel, yearMore: yearMore };
 })();
