@@ -94,6 +94,9 @@ function signOut(){ CJ.logout(); DATA=null; LEDGER_CACHE=null; VR_CACHE=null; CO
 window.addEventListener('cj:signedout', function(){ showSignIn('Your session expired — sign in again.'); });
 window.addEventListener('hashchange', function(){ if(DATA && (viewFromHash()!==current || /[?&]p=/.test(location.hash))) render(viewFromHash()); });
 function startApp(){
+  /* hardReload() loads the page as ?v=<timestamp> to get past Safari's cache; once the fresh
+     copy is running that tag has done its job, so drop it from the address bar. */
+  if(/[?&]v=\d+/.test(location.search)){ try{ history.replaceState(null,'',location.pathname+(location.hash||'')); }catch(e){} }
   if(CJ.session()) boot(); else showSignIn('');
 }
 
