@@ -8,8 +8,8 @@
 window.CJ_CONFIG = {
   apiUrl: 'https://script.google.com/macros/s/AKfycbwow6TV_yoeVzWN7SbEu-DugfIUfBT1NeOQpdm5ilLrMwOSA42N9H8BiEqu4vC4k3a8/exec',
   googleClientId: '211334963834-rsgqo4k7h6fto992ei6qbbpjb4cjdjcb.apps.googleusercontent.com',
-  siteVersion: 'site 1.4.3',
-  apiVersion: 18,
+  siteVersion: 'site 1.4.4',
+  apiVersion: 19,
   benchApiUrl: 'https://script.google.com/macros/s/AKfycbyC2-0r6vfV7pylr0yVHKLIwiFm8OFJMqAVVWbFJM-OwGdWgFXMuC9W3uBZRAO2N8fh/exec',
-  benchViaAdmin: false
+  benchViaAdmin: true
 };
