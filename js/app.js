@@ -2247,7 +2247,10 @@ var GCP_AUDIENCE_URL='https://console.cloud.google.com/auth/audience?project=211
 function payEmailNextStep_(email){
   if(!email) return '';
   PAY_MSG_HTML=true;
-  return ' <b>Next step:</b> add <b>'+esc(email)+'</b> as a test user in Google Cloud so they can sign in \u2192 <a href="'+GCP_AUDIENCE_URL+'" target="_blank" rel="noopener" style="font-weight:700">open Google Auth Platform \u2197</a> (Audience \u2192 Test users \u2192 Add users).';
+  /* The Google sign-in app was published 22 Sep 2026, so there is no test-user list any more —
+     the roster email alone is the whole onboarding. GCP_AUDIENCE_URL kept in case it is ever
+     put back into Testing. */
+  return ' <b>'+esc(email)+'</b> can now sign in at cjaviationtn.org with that Google account.';
 }
 var PAY_PER_PAGE=50, PAY_TPAGE=0, PAY_PPAGE=0;
 var PAY_TSORT='date', PAY_TDIR=-1;
