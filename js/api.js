@@ -25,6 +25,7 @@
     var s = getSession();
     if (s && s.session) body.session = s.session;
     if (extra) for (var k in extra) body[k] = extra[k];
+    if (window.CJ_VIEW_AS_CREW) body.asCrew = true;   // admin's "View as crew" switch (API 22+)
     return fetch(API_URL, {
       method: 'POST',
       // text/plain = no CORS preflight (Apps Script cannot answer OPTIONS)

@@ -4,7 +4,13 @@ var DATA=null, current='dashboard';
 /* Crew accounts (API 20+): employees sign in with Google too; the backend marks their session
    role 'crew' and only serves Time Clock, Purchase Orders, Bench Stock and CTK. A session with
    no role (minted before API 20) is an admin one. */
-function isCrew(){ var s=CJ.session()||{}; return s.role==='crew'; }
+var VIEW_AS_CREW=false; try{ VIEW_AS_CREW=(localStorage.getItem('cj_viewas')==='crew'); }catch(e){}
+window.CJ_VIEW_AS_CREW=VIEW_AS_CREW;   // api.js sends asCrew:true with every call while this is on
+function isCrew(){ var s=CJ.session()||{}; return s.role==='crew' || (VIEW_AS_CREW && s.role!=='crew'); }
+function isRealAdmin(){ var s=CJ.session()||{}; return !!s.session && s.role!=='crew'; }
+/* "View as crew": an admin sees exactly what the crew sees — the backend serves the session as
+   crew too (asCrew), so it is a real test, not just a hidden menu. Reload applies it. */
+function setViewAs(crew){ try{ if(crew) localStorage.setItem('cj_viewas','crew'); else localStorage.removeItem('cj_viewas'); }catch(e){} location.reload(); }
 var CREW_VIEWS={clock:1,po:1,bench:1,cal:1};
 function homeView(){ return isCrew()?'clock':'dashboard'; }
 var COA_CACHE=null, COA_EDIT_ROW=null, COA_MSG=null, COA_SHOW_ARCH=false, COA_PANEL=null;
@@ -135,7 +141,7 @@ function buildShell(){
     +'<nav class="nav" id="nav">'+navHtml+'</nav>'
     +'<div class="foot">Reads &amp; writes your Google Sheet live.<br>Loaded '+esc(DATA.generatedAt)+'.'
     +'<div class="verstamp" id="verstamp"></div>'
-    +'<div class="who">'+esc((CJ.session()||{}).email||'')+' · <a href="#" id="signout">Sign out</a></div></div>'
+    +'<div class="who">'+esc((CJ.session()||{}).email||'')+' · <a href="#" id="signout">Sign out</a>'+(isRealAdmin()?'<br><a href="#" id="viewas">'+(VIEW_AS_CREW?'\u2190 Back to admin view':'View as crew \u2192')+'</a>':'')+'</div></div>'
     +'</aside><div class="drawer-bg" id="drawer-bg"></div>'
     +'<main class="main"><div class="mbar" id="mbar"><button class="mbar-btn" id="mbar-menu" aria-label="Menu" title="Menu">\u2630</button><div class="mbar-title" id="mbar-title"></div><div class="logo-badge"></div></div>'
     +'<div class="mobile-nav" id="mnav"></div><div id="content"></div></main>'+pwaBarHtml()+'</div>';
@@ -146,6 +152,7 @@ function buildShell(){
   if(bg) bg.onclick=function(){ drawerToggle(false); };
 
   var so=document.getElementById('signout'); if(so) so.onclick=function(ev){ ev.preventDefault(); signOut(); };
+  var va=document.getElementById('viewas'); if(va) va.onclick=function(ev){ ev.preventDefault(); setViewAs(!VIEW_AS_CREW); };
   var tog=document.getElementById('side-toggle');
   if(tog) tog.onclick=function(){ SIDE_NARROW=!SIDE_NARROW;
     try{ localStorage.setItem('cj_side', SIDE_NARROW?'1':'0'); }catch(e){}
