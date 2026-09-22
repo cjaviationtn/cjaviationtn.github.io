@@ -746,3 +746,13 @@
 #clock-wo{font-size:16px;padding:13px 12px;margin-bottom:6px}
 .clock-btn{width:100%;padding:17px;font-size:19px;font-weight:700;border:0;border-radius:12px;color:#fff;cursor:pointer;letter-spacing:.5px;margin-top:10px;font-family:inherit}
 .clock-btn.in{background:#1f9d55} .clock-btn.out{background:#c0392b} .clock-btn:disabled{opacity:.55}
+
+/* Phone drawer: bigger type (Joel, 22 Sep — the slide-out menu was too small to read) */
+@media(max-width:900px){
+  .side,.app.narrow .side{width:300px}
+  .side .brand h1{font-size:19px} .side .brand .tagline{font-size:10.5px} .side .brand .subtag{font-size:13.5px}
+  .side .nav button,.app.narrow .side .nav button{font-size:17.5px;padding:15px 20px;gap:14px}
+  .side .nav .ico,.app.narrow .side .nav .ico{width:24px;font-size:19px}
+  .side .foot{font-size:13.5px;line-height:1.55}
+  .side .foot .verstamp{font-size:13px}
+}

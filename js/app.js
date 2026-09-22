@@ -179,7 +179,7 @@ function render(v){
   $('#content').innerHTML=printHead(VIEW_TITLE[v])+VIEWS[v]();
   var btns=document.querySelectorAll('#nav button');
   for(var i=0;i<btns.length;i++) btns[i].classList.toggle('active',btns[i].getAttribute('data-view')===v);
-  renderMnav(); if(v!=='bench') injectPrintControls();  /* bench is a frame — print from inside it */
+  renderMnav(); if(v!=='bench' && v!=='clock') injectPrintControls();  /* nothing to print on Bench Stock (own print) or the Time Clock */
   if(v==='dashboard') loadDash();
   if(v==='entry') wireEntry();
   if(v==='ledger') loadLedger();
