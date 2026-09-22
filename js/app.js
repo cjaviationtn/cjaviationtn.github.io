@@ -2240,7 +2240,15 @@ function poImpWire(){
 }
 
 
-var PAY_CACHE=null, PAY_MSG=null, PAY_PANEL=null, PAY_TEDIT=null;
+var PAY_CACHE=null, PAY_MSG=null, PAY_MSG_HTML=false, PAY_PANEL=null, PAY_TEDIT=null;
+/* Google's sign-in app is in "Testing" mode: a new crew Gmail also has to be added as a test user
+   in Google Cloud, or Google refuses the sign-in. This is the page for it (project cj-admin-site). */
+var GCP_AUDIENCE_URL='https://console.cloud.google.com/auth/audience?project=211334963834';
+function payEmailNextStep_(email){
+  if(!email) return '';
+  PAY_MSG_HTML=true;
+  return ' <b>Next step:</b> add <b>'+esc(email)+'</b> as a test user in Google Cloud so they can sign in \u2192 <a href="'+GCP_AUDIENCE_URL+'" target="_blank" rel="noopener" style="font-weight:700">open Google Auth Platform \u2197</a> (Audience \u2192 Test users \u2192 Add users).';
+}
 var PAY_PER_PAGE=50, PAY_TPAGE=0, PAY_PPAGE=0;
 var PAY_TSORT='date', PAY_TDIR=-1;
 var PAY_JOB='';
@@ -2438,7 +2446,7 @@ function payM(n){ return money(n)||'$0.00'; }
 
 function paintPay(){
   var d=PAY_CACHE, w=$('#pay-wrap'); if(!w) return;
-  if(PAY_MSG){ var f=$('#pay-flash'); if(f) f.innerHTML='<div class="flash ok">'+esc(PAY_MSG)+'</div>'; PAY_MSG=null; }
+  if(PAY_MSG){ var f=$('#pay-flash'); if(f) f.innerHTML='<div class="flash ok">'+(PAY_MSG_HTML?PAY_MSG:esc(PAY_MSG))+'</div>'; PAY_MSG=null; PAY_MSG_HTML=false; }
   var t=d.totals;
   var tiles='<div class="grid g4" style="margin-bottom:6px">'
     + tile('navy','Total Earned',money(t.earned),'labor logged')
@@ -2739,7 +2747,8 @@ var jb=$('#pay-job'); if(jb) jb.onclick=function(){ PAY_PANEL=(PAY_PANEL==='job'
     $('#pe-close').onclick=function(){ PAY_PANEL=null; paintPay(); };
     var add=$('#pe-add'); if(add) add.onclick=function(){
       var n=$('#pe-name').value.trim(); if(!n){ $('#pay-flash').innerHTML='<div class="flash err">Enter a name.</div>'; return; }
-      payRun('payAddEmployee',{ name:n, rate:$('#pe-newrate').value, role:$('#pe-newrole')?$('#pe-newrole').value:'', raise:$('#pe-newraise')?$('#pe-newraise').value:'', hire:$('#pe-newhire')?$('#pe-newhire').value:'', email:$('#pe-newemail')?$('#pe-newemail').value.trim():'' },undefined,'✓ Added '+n+'.',this);
+      var ne=$('#pe-newemail')?$('#pe-newemail').value.trim():'';
+      payRun('payAddEmployee',{ name:n, rate:$('#pe-newrate').value, role:$('#pe-newrole')?$('#pe-newrole').value:'', raise:$('#pe-newraise')?$('#pe-newraise').value:'', hire:$('#pe-newhire')?$('#pe-newhire').value:'', email:ne },undefined,function(){ return '\u2713 Added '+esc(n)+'.'+payEmailNextStep_(ne); },this);
     };
     var saves=document.querySelectorAll('[data-pesave]');
     for(var i=0;i<saves.length;i++) saves[i].onclick=function(){
@@ -2749,7 +2758,9 @@ var jb=$('#pay-job'); if(jb) jb.onclick=function(){ PAY_PANEL=(PAY_PANEL==='job'
       var rai=document.querySelector('.pe-raise[data-name="'+name.replace(/"/g,'\\"')+'"]');
       var hir=document.querySelector('.pe-hire[data-name="'+name.replace(/"/g,'\\"')+'"]');
       var eml=document.querySelector('.pe-email[data-name="'+name.replace(/"/g,'\\"')+'"]');
-      payRun('payUpdateEmployee',name,{ rate:inp?inp.value:'', role:rol?rol.value:null, raise:rai?rai.value:null, hire:hir?hir.value:null, email:eml?eml.value.trim():null },'✓ Updated '+name+'.',this);
+      var prev=''; for(var pi=0;pi<PAY_CACHE.roster.length;pi++) if(PAY_CACHE.roster[pi].name===name) prev=(PAY_CACHE.roster[pi].email||'').toLowerCase();
+      var nowE=eml?eml.value.trim():'';
+      payRun('payUpdateEmployee',name,{ rate:inp?inp.value:'', role:rol?rol.value:null, raise:rai?rai.value:null, hire:hir?hir.value:null, email:eml?nowE:null },function(){ var m='\u2713 Updated '+esc(name)+'.'; if(nowE && nowE.toLowerCase()!==prev) m+=payEmailNextStep_(nowE); else if(!nowE && prev){ PAY_MSG_HTML=true; m+=' '+esc(name)+' can no longer sign in to the site.'; } return m; },this);
     };
     var dels=document.querySelectorAll('[data-pedel]');
     for(var j=0;j<dels.length;j++) dels[j].onclick=function(){
