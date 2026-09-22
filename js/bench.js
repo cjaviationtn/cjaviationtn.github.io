@@ -30,14 +30,26 @@ function call(action, args){
   if (!url || url.indexOf('PASTE_') === 0){
     return Promise.reject(new Error('API URL is not set in config.js'));
   }
-  return fetch(url, {
-    method: 'POST',
-    redirect: 'follow',
-    body: JSON.stringify({ token: TOKEN, action: action, args: args || [] })
-  }).then(function(r){
-    if (!r.ok) throw new Error('Server returned ' + r.status);
-    return r.json();
-  }).then(function(j){
+  /* Apps Script answers through a googleusercontent redirect that now and then 404s or
+     returns an HTML error page for a request that is perfectly fine — retry a couple of times
+     before giving up, otherwise a single hiccup strands the tab on "Loading". */
+  function attempt(n){
+    return fetch(url, {
+      method: 'POST',
+      redirect: 'follow',
+      body: JSON.stringify({ token: TOKEN, action: action, args: args || [] })
+    }).then(function(r){
+      if (!r.ok) throw new Error('Server returned ' + r.status);
+      return r.text().then(function(t){
+        try { return JSON.parse(t); } catch (e) { throw new Error('Server sent a non-JSON reply'); }
+      });
+    }).catch(function(e){
+      if (n <= 0) throw e;
+      console.warn('Bench Stock API retry after: ' + e.message);
+      return new Promise(function(res){ setTimeout(res, 600); }).then(function(){ return attempt(n - 1); });
+    });
+  }
+  return attempt(2).then(function(j){
     if (!j || !j.ok){
       var msg = (j && j.error) || 'Request failed';
       if (j && j.code === 'AUTH') { lockOut(); }
