@@ -737,3 +737,12 @@
 .ml-tbl .ml-total td{font-weight:600;background:var(--cream)}
 .chip.ok{background:#e6f4ea;border-color:#b7dfc2;color:#1d6b35}
 @media (max-width:900px){ .ml-top{grid-template-columns:1fr} }
+
+/* Time Clock (crew) */
+.clock-card{max-width:460px}
+.clock-who{font-size:18px;font-weight:600;color:var(--navy);margin-bottom:12px}
+.clock-status{font-size:15px;line-height:1.5;margin-bottom:6px}
+.clock-status b{color:#1f9d55}
+#clock-wo{font-size:16px;padding:13px 12px;margin-bottom:6px}
+.clock-btn{width:100%;padding:17px;font-size:19px;font-weight:700;border:0;border-radius:12px;color:#fff;cursor:pointer;letter-spacing:.5px;margin-top:10px;font-family:inherit}
+.clock-btn.in{background:#1f9d55} .clock-btn.out{background:#c0392b} .clock-btn:disabled{opacity:.55}

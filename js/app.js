@@ -1,6 +1,12 @@
 
 
 var DATA=null, current='dashboard';
+/* Crew accounts (API 20+): employees sign in with Google too; the backend marks their session
+   role 'crew' and only serves Time Clock, Purchase Orders, Bench Stock and CTK. A session with
+   no role (minted before API 20) is an admin one. */
+function isCrew(){ var s=CJ.session()||{}; return s.role==='crew'; }
+var CREW_VIEWS={clock:1,po:1,bench:1,cal:1};
+function homeView(){ return isCrew()?'clock':'dashboard'; }
 var COA_CACHE=null, COA_EDIT_ROW=null, COA_MSG=null, COA_SHOW_ARCH=false, COA_PANEL=null;
 var LEDGER_CACHE=null, VR_CACHE=null, LOGO_URI='';
 var VIEW_HIST=[], RENDER_BACK=false;
@@ -45,24 +51,25 @@ function updateBar(){
   var bk=document.getElementById('pwa-back'); if(bk) bk.disabled=!VIEW_HIST.length;
 }
 function boot(){
-  $('#root').innerHTML='<div class="loading"><div><div class="spin"></div>Loading your books…</div></div>';
-  google.script.run
+  $('#root').innerHTML='<div class="loading"><div><div class="spin"></div>'+(isCrew()?'Loading…':'Loading your books…')+'</div></div>';
+  NAV = isCrew() ? NAV_CREW : NAV_ADMIN;
+  var run=google.script.run
     .withSuccessHandler(function(d){ DATA=d; buildShell(); render(viewFromHash()); })
     .withFailureHandler(function(e){
       if(e && e.code==='AUTH'){ showSignIn(''); return; }
-      $('#root').innerHTML='<div class="loading"><div>Could not load the sheet.<br><span class="hint">'+esc(e.message||e)+'</span><br><br><button class="btn ghost sm" onclick="boot()">Try again</button></div></div>'; })
-    .getBootstrap();
+      $('#root').innerHTML='<div class="loading"><div>Could not load the sheet.<br><span class="hint">'+esc(e.message||e)+'</span><br><br><button class="btn ghost sm" onclick="boot()">Try again</button></div></div>'; });
+  if(isCrew()) run.getCrewBootstrap(); else run.getBootstrap();
 }
 
 /* ---- sign-in ------------------------------------------------------- */
-function viewFromHash(){ var h=(location.hash||'').replace('#','').split('?')[0]; return VIEWS[h]?h:'dashboard'; }
+function viewFromHash(){ var h=(location.hash||'').replace('#','').split('?')[0]; if(isCrew() && !CREW_VIEWS[h]) return 'clock'; return VIEWS[h]?h:homeView(); }
 function showSignIn(msg){
   $('#root').innerHTML=
     '<div class="signin"><div class="signin-card">'
     +'<div class="logo-badge"></div>'
     +'<h1>C&amp;J AVIATION</h1><div class="tagline">Aircraft Mechanics</div>'
     +'<div class="subtag">Accounting/Admin</div>'
-    +'<p class="hint">Sign in with the Google account that has access to the books.</p>'
+    +'<p class="hint">Sign in with your Google account.</p>'
     +'<div id="gsi-btn"></div>'
     +'<div id="signin-msg" class="signin-msg">'+esc(msg||'')+'</div>'
     +'</div><div class="signin-foot">cjaviationtn.org · '+esc(CJ_CONFIG.siteVersion)+'</div></div>';
@@ -84,7 +91,7 @@ function startApp(){
   if(CJ.session()) boot(); else showSignIn('');
 }
 
-var NAV=[
+var NAV_ADMIN=[
   ['dashboard','◧','Dashboard'],
   ['entry','＋','New Transaction'],
   ['ledger','≣','General Ledger'],
@@ -99,7 +106,14 @@ var NAV=[
   ['mileage','⛟','Mileage'],
   ['mr','✎','Missing Receipt']
 ];
-var VIEW_TITLE={dashboard:'Dashboard',entry:'New Transaction',ledger:'General Ledger',tbx:'TBX Invoice Summary',pl:'Income Statement (P&L)',bs:'Balance Sheet',equity:'Member Equity',coa:'Chart of Accounts',vendors:'Vendor Rules',po:'Purchase Orders',bench:'Bench Stock',pay:'Payroll',cal:'CTK — Calibrated Tool Kit',venmo:'Venmo Fee Calculator',mileage:'Mileage Log',mr:'Missing Receipt Affidavit'};
+var NAV_CREW=[
+  ['clock','⏱','Time Clock'],
+  ['po','◨','Purchase Orders'],
+  ['bench','⬢','Bench Stock'],
+  ['cal','🔧','CTK']
+];
+var NAV=NAV_ADMIN;
+var VIEW_TITLE={dashboard:'Dashboard',entry:'New Transaction',ledger:'General Ledger',tbx:'TBX Invoice Summary',pl:'Income Statement (P&L)',bs:'Balance Sheet',equity:'Member Equity',coa:'Chart of Accounts',vendors:'Vendor Rules',po:'Purchase Orders',bench:'Bench Stock',clock:'Time Clock',pay:'Payroll',cal:'CTK — Calibrated Tool Kit',venmo:'Venmo Fee Calculator',mileage:'Mileage Log',mr:'Missing Receipt Affidavit'};
 
 var SIDE_NARROW=false;
 try{ SIDE_NARROW = (localStorage.getItem('cj_side')==='1'); }catch(e){}
@@ -117,7 +131,7 @@ function buildShell(){
   $('#root').innerHTML =
     '<div class="app'+(isStandalone()?' standalone':'')+'"><aside class="side">'
     +'<button class="side-toggle" id="side-toggle"></button>'
-    +'<div class="brand"><div class="logo-badge"></div><div class="btxt"><h1>C&J AVIATION</h1><span class="tagline">Aircraft Mechanics</span><span class="subtag">Accounting/Admin Page</span></div></div>'
+    +'<div class="brand"><div class="logo-badge"></div><div class="btxt"><h1>C&J AVIATION</h1><span class="tagline">Aircraft Mechanics</span><span class="subtag">'+(isCrew()?'Crew Page':'Accounting/Admin Page')+'</span></div></div>'
     +'<nav class="nav" id="nav">'+navHtml+'</nav>'
     +'<div class="foot">Reads &amp; writes your Google Sheet live.<br>Loaded '+esc(DATA.generatedAt)+'.'
     +'<div class="verstamp" id="verstamp"></div>'
@@ -145,8 +159,9 @@ function buildShell(){
 }
 
 
-var VIEWS={dashboard:vDashboard,entry:vEntry,ledger:vLedger,tbx:vTBX,pl:vPL,bs:vBS,equity:vEquity,coa:vCOA,vendors:vVendors,po:vPO,bench:vBench,pay:vPay,cal:vCal,venmo:vVenmo,mileage:vMileage,mr:vMR};
+var VIEWS={dashboard:vDashboard,entry:vEntry,ledger:vLedger,tbx:vTBX,pl:vPL,bs:vBS,equity:vEquity,coa:vCOA,vendors:vVendors,po:vPO,bench:vBench,clock:vClock,pay:vPay,cal:vCal,venmo:vVenmo,mileage:vMileage,mr:vMR};
 function render(v){
+  if(isCrew() && !CREW_VIEWS[v]) v='clock';
   if(current && current!==v && !RENDER_BACK) VIEW_HIST.push(current);
   if(v==='ledger' && current!=='ledger') glDefaultSort();
   current=v;
@@ -170,6 +185,7 @@ function render(v){
   if(v==='mileage') loadMileage();
   if(v==='venmo') wireVenmo();
   if(v==='mr') wireMR();
+  if(v==='clock') loadClock();
   if(v==='bench'){ if(window.BS) BS.mount(BENCH_P); else $('#view').innerHTML='<div class="bs-spin">Bench Stock script did not load \u2014 reload the page.</div>'; }
   updateBar();
 }
@@ -3194,7 +3210,7 @@ function calClick(e){
    #bench?p=<part> — render() captures the part before the hash is normalised. */
 var BENCH_P='';
 function vBench(){
-  var tabs=[['parts','Parts'],['reorder','Reorder'],['labels','Labels'],['year','Year-end'],['manage','Manage']], th='';
+  var tabs=isCrew()?[['parts','Parts'],['reorder','Reorder']]:[['parts','Parts'],['reorder','Reorder'],['labels','Labels'],['year','Year-end'],['manage','Manage']], th='';
   for(var i=0;i<tabs.length;i++) th+='<button id="tab-'+tabs[i][0]+'"'+(i===0?' class="on"':'')+' onclick="BS.switchTab(\''+tabs[i][0]+'\')">'+tabs[i][1]+'</button>';
   return topbar('Bench Stock','Mx trailer inventory \u00b7 scan, take, reorder, labels','live \u00b7 from the Bench Stock sheet')
     +'<div class="bs" id="bs-root"><div class="bs-app">'
@@ -3207,6 +3223,47 @@ function vBench(){
     +  '<div id="pmConfirmSlot"></div><button class="pmclose" onclick="BS.closePhoto()">Close</button></div></div>'
     +'<div class="toast" id="toast"></div><img class="bs-logo" src="img/logo.png" alt="">'
     +'</div>';
+}
+
+/* ================= TIME CLOCK (crew, site 1.5.0) =================
+   The crew's clock in / out, ported from the personal-link time clock page. Talks to
+   clockState / clockIn / clockOut in the Admin backend (Pay backend.gs), which write the same
+   Clock Punches + Time Log rows and send the same Pushover ping. The employee is whoever is
+   signed in — the backend maps the Google address to the roster name. */
+var CLOCK_STATE=null, CLOCK_BUSY=false, CLOCK_MSG=null;
+function vClock(){
+  return topbar('Time Clock','Clock in on a work order, clock out when you\u2019re done','live \u00b7 Pay Tracker sheet')
+    +'<div id="clock-wrap"><div class="card pad miniload"><span class="spin"></span> Loading\u2026</div></div>';
+}
+function loadClock(){
+  google.script.run.withSuccessHandler(function(st){ CLOCK_STATE=st; paintClock(); })
+    .withFailureHandler(function(e){ var w=$('#clock-wrap'); if(w && current==='clock') w.innerHTML='<div class="card pad"><div class="flash err">'+esc(e.message||String(e))+'</div><button class="btn ghost sm" onclick="loadClock()">Try again</button></div>'; })
+    .clockState();
+}
+function paintClock(){
+  var w=$('#clock-wrap'); if(!w || !CLOCK_STATE || current!=='clock') return;
+  var st=CLOCK_STATE, h='<div class="card pad clock-card"><div class="clock-who">'+esc(st.name)+'</div>';
+  if(st.punch){
+    h+='<div class="clock-status">You\u2019re clocked in since <b>'+esc(st.punch.inTime)+'</b><br>WO '+esc(st.punch.wo)+(st.punch.desc?' \u2014 '+esc(st.punch.desc):'')+'</div>'
+      +'<button class="clock-btn out" id="clock-out"'+(CLOCK_BUSY?' disabled':'')+'>CLOCK OUT</button>';
+  } else {
+    var opts='';
+    for(var i=0;i<(st.workOrders||[]).length;i++){ var o=st.workOrders[i]; opts+='<option value="'+esc(o.num)+'">'+esc(o.num)+(o.desc?' \u2014 '+esc(o.desc):'')+'</option>'; }
+    h+='<select id="clock-wo"><option value="">Select work order\u2026</option>'+opts+'</select>'
+      +'<button class="clock-btn in" id="clock-in"'+(CLOCK_BUSY?' disabled':'')+'>CLOCK IN</button>';
+    if(!(st.workOrders||[]).length) h+='<div class="hint" style="margin-top:10px">No open work orders right now.</div>';
+  }
+  if(CLOCK_MSG) h+='<div class="flash '+CLOCK_MSG.kind+'" style="margin-top:14px">'+esc(CLOCK_MSG.msg)+'</div>';
+  h+='</div>'; w.innerHTML=h;
+  var bi=$('#clock-in'); if(bi) bi.onclick=function(){ var wo=$('#clock-wo').value; if(!wo){ CLOCK_MSG={kind:'err',msg:'Pick a work order first.'}; paintClock(); return; } clockCall('clockIn',[wo]); };
+  var bo=$('#clock-out'); if(bo) bo.onclick=function(){ clockCall('clockOut',[]); };
+}
+function clockCall(fn,args){
+  CLOCK_BUSY=true; CLOCK_MSG=null; paintClock();
+  var r=google.script.run
+    .withSuccessHandler(function(res){ CLOCK_BUSY=false; CLOCK_MSG={kind:(res&&res.ok)?'ok':'err',msg:(res&&res.msg)||''}; paintClock(); loadClock(); })
+    .withFailureHandler(function(e){ CLOCK_BUSY=false; CLOCK_MSG={kind:'err',msg:e.message||String(e)}; paintClock(); });
+  r[fn].apply(r,args);
 }
 
 /* ================= VENMO FEE CALCULATOR ================= */

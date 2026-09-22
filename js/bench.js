@@ -750,7 +750,7 @@ function doDeletePhoto(){
 function switchTab(t){
   curTab = t;
   ['parts','reorder','labels','year','manage'].forEach(function(k){
-    document.getElementById('tab-' + k).className = (k===t ? 'on' : '');
+    var tb = document.getElementById('tab-' + k); if (tb) tb.className = (k===t ? 'on' : '');   // crew view has only Parts + Reorder
   });
   document.getElementById('searchwrap').style.display = (t==='parts' ? 'block' : 'none');
   if (t==='parts'){
