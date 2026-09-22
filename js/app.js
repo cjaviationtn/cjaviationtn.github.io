@@ -2629,16 +2629,17 @@ function payEmpPanel(){
       + '<td><input class="pe-role" data-name="'+esc(r[i].name)+'" value="'+esc(r[i].role||'')+'" placeholder="e.g. A&amp;P" style="width:150px;padding:6px"></td>'
       + '<td><input class="pe-raise" data-name="'+esc(r[i].name)+'" type="date" value="'+esc(r[i].raiseIso||'')+'" style="width:150px;padding:6px"></td>'
       + '<td><input class="pe-hire" data-name="'+esc(r[i].name)+'" type="date" value="'+esc(r[i].hireIso||'')+'" style="width:150px;padding:6px"></td>'
-      + '<td style="white-space:nowrap">'+payLinkCell_(r[i].link, r[i].name)+'</td>'
+      + '<td><input class="pe-email" data-name="'+esc(r[i].name)+'" type="email" value="'+esc(r[i].email||'')+'" placeholder="name@gmail.com" style="width:210px;padding:6px"></td>'
       + '<td style="white-space:nowrap"><button class="btn ghost" style="padding:4px 9px;font-size:12px" data-pesave="'+esc(r[i].name)+'">Save</button> '
       + '<button class="btn" style="background:var(--bad);padding:4px 9px;font-size:12px" data-pedel="'+esc(r[i].name)+'">Delete</button></td></tr>';
   }
   return '<div class="card pad" style="margin-bottom:18px"><div class="section-title" style="margin-top:0">Manage employees</div>'
-    + '<div class="scroll pe-wrap"><table class="tb pe-tbl"><thead><tr><th>Name</th><th>Rate $/hr</th><th>Role / Notes</th><th>Last Pay Raise</th><th>Hire Date</th><th>Time clock link</th><th></th></tr></thead><tbody>'+rowsH+'</tbody></table></div>'
+    + '<div class="scroll pe-wrap"><table class="tb pe-tbl"><thead><tr><th>Name</th><th>Rate $/hr</th><th>Role / Notes</th><th>Last Pay Raise</th><th>Hire Date</th><th>Google Email (site sign-in)</th><th></th></tr></thead><tbody>'+rowsH+'</tbody></table></div>'
     + '<div class="form-row" style="margin-top:16px"><div><label>New employee</label><input id="pe-name" placeholder="Full name"></div><div><label>Default rate ($/hr)</label><input id="pe-newrate" type="number" step="0.01" placeholder="e.g. 25"></div></div>'
     + '<div class="form-row"><div><label>Role / Notes</label><input id="pe-newrole" placeholder="e.g. A&amp;P"></div><div><label>Last pay raise</label><input id="pe-newraise" type="date"></div><div><label>Hire date</label><input id="pe-newhire" type="date"></div></div>'
+    + '<div class="form-row"><div><label>Google email (site sign-in)</label><input id="pe-newemail" type="email" placeholder="name@gmail.com"></div></div>'
     + '<div style="display:flex;gap:10px"><button class="btn" id="pe-add">Add employee</button><button class="btn ghost" id="pe-close">Close</button></div>'
-    + '<div class="hint" style="margin-top:12px">Deleting first locks that person\'s past Time Log amounts so their history stays intact, then removes them from the roster and revokes their time clock link.</div></div>';
+    + '<div class="hint" style="margin-top:12px">Google email is how the crew sign in to cjaviationtn.org (Time Clock, Purchase Orders, Bench Stock, CTK). Clear it and save to take someone\'s access away \u2014 they are signed out everywhere at once. Deleting locks past Time Log amounts so history stays intact, removes them from the roster, and signs them out.</div></div>';
 }
 
 function payRun(fn, arg1, arg2, okMsg, btn){
@@ -2671,13 +2672,7 @@ function wirePay(){
   var lt=$('#pay-logtime'); if(lt) lt.onclick=function(){ PAY_PANEL=(PAY_PANEL==='time'?null:'time'); PAY_TEDIT=null; paintPay(); };
   var rc=$('#pay-record'); if(rc) rc.onclick=function(){ PAY_PANEL=(PAY_PANEL==='pay'?null:'pay'); PAY_TEDIT=null; paintPay(); };
   var rp=$('#pay-runpayroll'); if(rp) rp.onclick=function(){ PAY_PANEL=(PAY_PANEL==='payroll'?null:'payroll'); PAY_TEDIT=null; paintPay(); };
-  var gns=document.querySelectorAll('[data-pegen]');
-  for(var z=0;z<gns.length;z++) gns[z].onclick=function(){
-    var who=this.getAttribute('data-pegen');
-    payRun('payGenerateLink',who,undefined,'\u2713 Link created for '+who+'.',this);
-  };
-  var cps=document.querySelectorAll('[data-pecopy]');
-  for(var q=0;q<cps.length;q++) cps[q].onclick=function(){ payCopy_(this.getAttribute('data-pecopy'), this); };
+  /* personal time clock links retired 22 Sep 2026 — crew sign in with Google (payLinkCell_/payCopy_ kept for reference) */
 var jb=$('#pay-job'); if(jb) jb.onclick=function(){ PAY_PANEL=(PAY_PANEL==='job'?null:'job'); PAY_TEDIT=null; paintPay(); };
   var me=$('#pay-emp'); if(me) me.onclick=function(){ PAY_PANEL=(PAY_PANEL==='emp'?null:'emp'); PAY_TEDIT=null; paintPay(); };
   var im=$('#pay-import'); if(im) im.onclick=function(){
@@ -2744,7 +2739,7 @@ var jb=$('#pay-job'); if(jb) jb.onclick=function(){ PAY_PANEL=(PAY_PANEL==='job'
     $('#pe-close').onclick=function(){ PAY_PANEL=null; paintPay(); };
     var add=$('#pe-add'); if(add) add.onclick=function(){
       var n=$('#pe-name').value.trim(); if(!n){ $('#pay-flash').innerHTML='<div class="flash err">Enter a name.</div>'; return; }
-      payRun('payAddEmployee',{ name:n, rate:$('#pe-newrate').value, role:$('#pe-newrole')?$('#pe-newrole').value:'', raise:$('#pe-newraise')?$('#pe-newraise').value:'', hire:$('#pe-newhire')?$('#pe-newhire').value:'' },undefined,'✓ Added '+n+'.',this);
+      payRun('payAddEmployee',{ name:n, rate:$('#pe-newrate').value, role:$('#pe-newrole')?$('#pe-newrole').value:'', raise:$('#pe-newraise')?$('#pe-newraise').value:'', hire:$('#pe-newhire')?$('#pe-newhire').value:'', email:$('#pe-newemail')?$('#pe-newemail').value.trim():'' },undefined,'✓ Added '+n+'.',this);
     };
     var saves=document.querySelectorAll('[data-pesave]');
     for(var i=0;i<saves.length;i++) saves[i].onclick=function(){
@@ -2753,12 +2748,13 @@ var jb=$('#pay-job'); if(jb) jb.onclick=function(){ PAY_PANEL=(PAY_PANEL==='job'
       var rol=document.querySelector('.pe-role[data-name="'+name.replace(/"/g,'\\"')+'"]');
       var rai=document.querySelector('.pe-raise[data-name="'+name.replace(/"/g,'\\"')+'"]');
       var hir=document.querySelector('.pe-hire[data-name="'+name.replace(/"/g,'\\"')+'"]');
-      payRun('payUpdateEmployee',name,{ rate:inp?inp.value:'', role:rol?rol.value:null, raise:rai?rai.value:null, hire:hir?hir.value:null },'✓ Updated '+name+'.',this);
+      var eml=document.querySelector('.pe-email[data-name="'+name.replace(/"/g,'\\"')+'"]');
+      payRun('payUpdateEmployee',name,{ rate:inp?inp.value:'', role:rol?rol.value:null, raise:rai?rai.value:null, hire:hir?hir.value:null, email:eml?eml.value.trim():null },'✓ Updated '+name+'.',this);
     };
     var dels=document.querySelectorAll('[data-pedel]');
     for(var j=0;j<dels.length;j++) dels[j].onclick=function(){
       var name=this.getAttribute('data-pedel');
-      if(!confirm('Remove '+name+' from the roster? Their past Time Log amounts are locked in first so history stays intact.')) return;
+      if(!confirm('Remove '+name+' from the roster? Their past Time Log amounts are locked in first so history stays intact, and they are signed out of the site.')) return;
       payRun('payDeleteEmployee',name,undefined,'✓ Removed '+name+'.',this);
     };
   }
