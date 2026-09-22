@@ -892,9 +892,14 @@ function paintLabels(){
     x.onclick = function(){ labelSel.splice(i,1); paintLabels(); renderLabelsCount(); };
     card.appendChild(x);
 
-    var t = document.createElement('div'); t.className = 'pn';
-    t.textContent = (pn === BLANK) ? 'Bench Stock' : pn;
-    card.appendChild(t);
+    /* The description usually carries the part number already ("STOP NUT AN363-524 …"), so
+       the big title on top only repeats it — show it only when the description doesn't. */
+    var descHasPn = !!(p && p.desc && pn !== BLANK && p.desc.toUpperCase().indexOf(String(pn).toUpperCase()) > -1);
+    if (!descHasPn){
+      var t = document.createElement('div'); t.className = 'pn';
+      t.textContent = (pn === BLANK) ? 'Bench Stock' : pn;
+      card.appendChild(t);
+    }
 
     var q = document.createElement('div'); q.className = 'qr';
     card.appendChild(q);
@@ -906,7 +911,7 @@ function paintLabels(){
     }
     var cap = document.createElement('div'); cap.className = 'cap';
     cap.textContent = (pn === BLANK) ? 'Scan to open bench stock'
-                                     : ((p && p.desc) ? p.desc.slice(0,40) : 'Scan to take / restock');
+                                     : ((p && p.desc) ? p.desc.slice(0, descHasPn ? 64 : 40) : 'Scan to take / restock');
     card.appendChild(cap);
 
     g.appendChild(card);
