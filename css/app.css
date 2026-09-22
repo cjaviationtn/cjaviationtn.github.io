@@ -756,3 +756,12 @@
   .side .foot{font-size:13.5px;line-height:1.55}
   .side .foot .verstamp{font-size:13px}
 }
+.clock-sumcard{margin-top:14px}
+.clock-h{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--muted);text-transform:uppercase;margin-bottom:8px}
+.clock-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.clock-tile{background:var(--cream);border-radius:9px;padding:9px 11px;min-width:0}
+.clock-tile small{display:block;font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.04em}
+.clock-tile b{font-size:17px;font-weight:600;color:var(--ink);word-break:break-word}
+.clock-tile.owed b{color:#b23b1e}
+.clock-row{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:7px 0;border-top:1px solid var(--line)}
+.clock-row span:last-child{font-weight:600;white-space:nowrap}

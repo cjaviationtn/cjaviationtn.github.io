@@ -3237,12 +3237,37 @@ function vBench(){
    clockState / clockIn / clockOut in the Admin backend (Pay backend.gs), which write the same
    Clock Punches + Time Log rows and send the same Pushover ping. The employee is whoever is
    signed in — the backend maps the Google address to the roster name. */
-var CLOCK_STATE=null, CLOCK_BUSY=false, CLOCK_MSG=null;
+var CLOCK_STATE=null, CLOCK_BUSY=false, CLOCK_MSG=null, CLOCK_SUM=null;
 function vClock(){
   return topbar('Time Clock','Clock in on a work order, clock out when you\u2019re done','live \u00b7 Pay Tracker sheet')
-    +'<div id="clock-wrap"><div class="card pad miniload"><span class="spin"></span> Loading\u2026</div></div>';
+    +'<div id="clock-wrap"><div class="card pad miniload"><span class="spin"></span> Loading\u2026</div></div>'
+    +'<div id="clock-sum"></div>';
+}
+/* Year-to-date pay summary for the signed-in employee — their own numbers only. */
+function loadClockSummary(){
+  google.script.run.withSuccessHandler(function(sm){ CLOCK_SUM=sm; paintClockSummary(); })
+    .withFailureHandler(function(e){ console.error('clockMySummary',e); var w=$('#clock-sum'); if(w) w.innerHTML=''; })
+    .clockMySummary();
+}
+function paintClockSummary(){
+  var w=$('#clock-sum'); if(!w || !CLOCK_SUM || current!=='clock') return;
+  var m=CLOCK_SUM, h='<div class="card pad clock-card clock-sumcard"><div class="clock-h">My pay \u00b7 '+esc(m.year)+'</div><div class="clock-grid">'
+    +'<div class="clock-tile"><small>ROLE</small><b>'+esc(m.role||'\u2014')+'</b></div>'
+    +'<div class="clock-tile"><small>RATE</small><b>'+(m.rate!==''&&m.rate!=null?money(m.rate)+' / hr':'\u2014')+'</b></div>'
+    +'<div class="clock-tile"><small>HOURS</small><b>'+esc(String(m.hours))+'</b></div>'
+    +'<div class="clock-tile"><small>EARNED</small><b>'+money(m.earned)+'</b></div>'
+    +'<div class="clock-tile"><small>PAID</small><b>'+money(m.paid)+'</b></div>'
+    +'<div class="clock-tile'+(m.balance>0?' owed':'')+'"><small>BALANCE OWED</small><b>'+money(m.balance)+'</b></div>'
+    +'</div>';
+  if(m.last && m.last.length){
+    h+='<div class="clock-h" style="margin-top:14px">Last entries</div>';
+    for(var i=0;i<m.last.length;i++){ var e=m.last[i]; h+='<div class="clock-row"><span>'+esc(payD(e.date))+(e.wo?' \u00b7 WO '+esc(e.wo):'')+'</span><span>'+esc(String(e.hours))+' hrs \u00b7 '+money(e.amount)+'</span></div>'; }
+  }
+  h+='<div class="hint" style="margin-top:8px">This year on the books \u00b7 balance owed = earned \u2212 paid</div></div>';
+  w.innerHTML=h;
 }
 function loadClock(){
+  loadClockSummary();
   google.script.run.withSuccessHandler(function(st){ CLOCK_STATE=st; paintClock(); })
     .withFailureHandler(function(e){ var w=$('#clock-wrap'); if(w && current==='clock') w.innerHTML='<div class="card pad"><div class="flash err">'+esc(e.message||String(e))+'</div><button class="btn ghost sm" onclick="loadClock()">Try again</button></div>'; })
     .clockState();
