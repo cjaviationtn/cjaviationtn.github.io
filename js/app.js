@@ -79,7 +79,7 @@ function onGoogleCredential(resp){
 }
 function signOut(){ CJ.logout(); DATA=null; LEDGER_CACHE=null; VR_CACHE=null; COA_CACHE=null; showSignIn('Signed out.'); }
 window.addEventListener('cj:signedout', function(){ showSignIn('Your session expired — sign in again.'); });
-window.addEventListener('hashchange', function(){ if(DATA && viewFromHash()!==current) render(viewFromHash()); });
+window.addEventListener('hashchange', function(){ if(DATA && (viewFromHash()!==current || /[?&]p=/.test(location.hash))) render(viewFromHash()); });
 function startApp(){
   if(CJ.session()) boot(); else showSignIn('');
 }

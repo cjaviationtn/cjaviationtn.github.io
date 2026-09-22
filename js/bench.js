@@ -46,10 +46,10 @@ function call(action, args){
     }).catch(function(e){
       if (n <= 0) throw e;
       console.warn('Bench Stock API retry after: ' + e.message);
-      return new Promise(function(res){ setTimeout(res, 600); }).then(function(){ return attempt(n - 1); });
+      return new Promise(function(res){ setTimeout(res, 1200); }).then(function(){ return attempt(n - 1); });
     });
   }
-  return attempt(2).then(function(j){
+  return attempt(3).then(function(j){
     if (!j || !j.ok){
       var msg = (j && j.error) || 'Request failed';
       if (j && j.code === 'AUTH') { lockOut(); }
@@ -170,7 +170,9 @@ function boot(){
     if (INITIAL_PN) input.value = INITIAL_PN;
     switchTab('parts');
   }).catch(function(e){
-    view.innerHTML = '<div class="empty">Could not load inventory.<br>' + esc(e && e.message || e) + '</div>';
+    console.error('Bench Stock load', e);
+    view.innerHTML = '<div class="empty">Could not reach the Bench Stock sheet just now.<br>' + esc(e && e.message || e)
+      + '<br><br><button class="more" style="max-width:260px" onclick="BS.mount()">Try again</button></div>';
   });
 }
 
