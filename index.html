@@ -33,9 +33,14 @@ document.write('<script src="config.js?_=' + Date.now() + '"><\/script>');
 (function(){
   var v = encodeURIComponent((window.CJ_CONFIG && window.CJ_CONFIG.siteVersion) || Date.now());
   document.write('<link rel="stylesheet" href="css/app.css?v=' + v + '">');
+  document.write('<link rel="stylesheet" href="css/bench.css?v=' + v + '">');
 })();
 </script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<!-- Bench Stock tab: QR labels + year-end PDF -->
+<script src="js/vendor/qrcode.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" defer></script>
 </head>
 <body>
 <div id="root"><div class="loading"><div><div class="spin"></div>Loading…</div></div></div>
@@ -44,6 +49,7 @@ document.write('<script src="config.js?_=' + Date.now() + '"><\/script>');
   var v = encodeURIComponent((window.CJ_CONFIG && window.CJ_CONFIG.siteVersion) || Date.now());
   document.write('<script src="js/api.js?v=' + v + '"><\/script>');
   document.write('<script src="js/app.js?v=' + v + '"><\/script>');
+  document.write('<script src="js/bench.js?v=' + v + '"><\/script>');
 })();
 </script>
 </body>

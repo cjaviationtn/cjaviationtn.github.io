@@ -55,7 +55,7 @@ function boot(){
 }
 
 /* ---- sign-in ------------------------------------------------------- */
-function viewFromHash(){ var h=(location.hash||'').replace('#',''); return VIEWS[h]?h:'dashboard'; }
+function viewFromHash(){ var h=(location.hash||'').replace('#','').split('?')[0]; return VIEWS[h]?h:'dashboard'; }
 function showSignIn(msg){
   $('#root').innerHTML=
     '<div class="signin"><div class="signin-card">'
@@ -150,6 +150,7 @@ function render(v){
   if(current && current!==v && !RENDER_BACK) VIEW_HIST.push(current);
   if(v==='ledger' && current!=='ledger') glDefaultSort();
   current=v;
+  if(v==='bench'){ var bm=/[?&]p=([^&#]*)/.exec(location.hash||''); BENCH_P=bm?decodeURIComponent(bm[1].replace(/\+/g,' ')):''; }
   if(location.hash!=='#'+v){ try{ history.replaceState(null,'','#'+v); }catch(e){ location.hash=v; } }
   var mainEl=document.querySelector('.main');
   if(mainEl) mainEl.classList.toggle('wide', v==='ledger'||v==='bench');
@@ -169,6 +170,7 @@ function render(v){
   if(v==='mileage') loadMileage();
   if(v==='venmo') wireVenmo();
   if(v==='mr') wireMR();
+  if(v==='bench'){ if(window.BS) BS.mount(BENCH_P); else $('#view').innerHTML='<div class="bs-spin">Bench Stock script did not load \u2014 reload the page.</div>'; }
   updateBar();
 }
 /* phone: the sidebar becomes a slide-in drawer behind the ☰ in the top bar */
@@ -3184,15 +3186,27 @@ function calClick(e){
 /* =================== END CTK — CALIBRATED TOOL KIT =================== */
 
 
-/* ================= BENCH STOCK (site 1.3.6) =================
-   The Benchstock site is its own GitHub Pages repo (cjaviationtn/benchstock), served under this
-   domain at /benchstock/. Embedded, not merged: the two Apps Script projects collide on
-   doGet/onOpen and the client globals ($, esc, money, render, DATA, current). No PIN — Joel
-   dropped the Benchstock PIN gate (Sep 2026); the admin site is behind Google sign-in. */
-var BENCH_URL='/benchstock/';
+/* ================= BENCH STOCK (native since site 1.4.0) =================
+   The Benchstock app lives in js/bench.js (a closure exporting window.BS) with its styles in
+   css/bench.css scoped under .bs — ported from the standalone cjaviationtn/benchstock site,
+   which now just redirects here. Data still comes from the Benchstock Apps Script
+   (CJ_CONFIG.benchApiUrl); the inventory sheet is untouched. A scanned QR label opens
+   #bench?p=<part> — render() captures the part before the hash is normalised. */
+var BENCH_P='';
 function vBench(){
-  return topbar('Bench Stock','Mx trailer inventory \u00b7 scan, take, reorder, labels','live \u00b7 cjaviationtn.org/benchstock')
-    +'<iframe class="bench-frame" src="'+BENCH_URL+'" title="Bench Stock" allow="camera"></iframe>';
+  var tabs=[['parts','Parts'],['reorder','Reorder'],['labels','Labels'],['year','Year-end'],['manage','Manage']], th='';
+  for(var i=0;i<tabs.length;i++) th+='<button id="tab-'+tabs[i][0]+'"'+(i===0?' class="on"':'')+' onclick="BS.switchTab(\''+tabs[i][0]+'\')">'+tabs[i][1]+'</button>';
+  return topbar('Bench Stock','Mx trailer inventory \u00b7 scan, take, reorder, labels','live \u00b7 from the Bench Stock sheet')
+    +'<div class="bs" id="bs-root"><div class="bs-app">'
+    +  '<header><div class="hrow"><div><div class="sub" id="sub"></div></div></div><div class="tabs">'+th+'</div></header>'
+    +  '<div class="searchwrap" id="searchwrap"><div class="searchbar"><input id="q" type="text" inputmode="search" placeholder="Search bin, part # or description"></div><div class="count" id="count"></div></div>'
+    +  '<div class="wrap" id="view"><div class="bs-spin">Loading inventory\u2026</div></div>'
+    +'</div>'
+    +'<div id="photoModal"><div class="pmwrap"><div class="pmtitle" id="pmTitle"></div><div class="pmsub" id="pmSub"></div><div class="pmimg" id="pmImg"></div>'
+    +  '<div class="pmbtns" id="pmBtns"><button class="pmreplace" onclick="BS.replacePhoto()">Replace photo</button><button class="pmdelete" onclick="BS.askDeletePhoto()">Delete photo</button></div>'
+    +  '<div id="pmConfirmSlot"></div><button class="pmclose" onclick="BS.closePhoto()">Close</button></div></div>'
+    +'<div class="toast" id="toast"></div><img class="bs-logo" src="img/logo.png" alt="">'
+    +'</div>';
 }
 
 /* ================= VENMO FEE CALCULATOR ================= */

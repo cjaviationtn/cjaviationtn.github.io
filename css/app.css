@@ -737,9 +737,3 @@
 .ml-tbl .ml-total td{font-weight:600;background:var(--cream)}
 .chip.ok{background:#e6f4ea;border-color:#b7dfc2;color:#1d6b35}
 @media (max-width:900px){ .ml-top{grid-template-columns:1fr} }
-
-/* Bench Stock — embedded benchstock site */
-.bench-frame{display:block;width:100%;height:calc(100vh - 190px);min-height:420px;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);background:#fff}
-@media (max-width:620px){ .bench-frame{height:calc(100vh - 170px)} }
-.app.standalone .bench-frame{height:calc(100vh - 250px)}
-@media print{ .bench-frame{display:none} }
