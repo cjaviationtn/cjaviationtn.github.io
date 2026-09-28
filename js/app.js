@@ -184,6 +184,7 @@ function render(v){
   for(var i=0;i<btns.length;i++) btns[i].classList.toggle('active',btns[i].getAttribute('data-view')===v);
   renderMnav(); if(v!=='bench' && v!=='clock') injectPrintControls();  /* nothing to print on Bench Stock (own print) or the Time Clock */
   if(v==='dashboard') loadDash();
+  if(v==='pl'||v==='bs'||v==='equity') wireFY();
   if(v==='entry') wireEntry();
   if(v==='ledger') loadLedger();
   if(v==='tbx') wireTBX();
@@ -218,7 +219,7 @@ function renderMnav(){
 function printHead(title){
   var d=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
   var logo = LOGO_URI ? '<img class="plogo" src="'+LOGO_URI+'">' : '<div class="logo-badge"></div>';
-  return '<div class="print-head">'+logo+'<div><div class="co">C&J AVIATION LLC — '+esc(title)+'</div><div class="meta">Fiscal Year 2026 · printed '+d+'</div></div></div>';
+  return '<div class="print-head">'+logo+'<div><div class="co">C&J AVIATION LLC — '+esc(title)+'</div><div class="meta">'+fyLabel()+' · printed '+d+'</div></div></div>';
 }
 function topbar(title,sub,tag){ return '<div class="topbar"><div><h2>'+title+'</h2><div class="sub">'+sub+'</div></div><div><span class="pill">'+(tag||'live · from your sheet')+'</span></div></div>'; }
 
@@ -246,13 +247,15 @@ function printAll(){
 
 function vDashboard(){
   var F=finBuild();
-  return topbar('Dashboard','Shop operations · financial statements · Fiscal Year 2026 · pulled live from your General Ledger'+(DATA.ledgerUpdated?'  ·  <span class="lupd">Ledger last updated: '+esc(DATA.ledgerUpdated)+'</span>':''))
-  +'<div class="fin-tools"><label class="fin-chk"><input type="checkbox" id="fin-zero"'+(FIN_SHOW_ZERO?' checked':'')+'> Show $0 accounts</label>'
-  +'<span class="hint">Each statement has its own Print button. "Print / PDF this page" prints the summary and all three statements, one per page.</span></div>'
+  return topbar('Dashboard','Shop operations · financial statements · '+fyLabel()+' · pulled live from your General Ledger'+(DATA.ledgerUpdated?'  ·  <span class="lupd">Ledger last updated: '+esc(DATA.ledgerUpdated)+'</span>':''))
+  +'<div class="fin-tools fy-tools">'+fySelectHtml()
+  +'<span class="hint">'+(fySelectHtml()?'Statements below are for the selected year; the balance sheet is as of Dec 31 for past years. ':'')+'Each statement has its own Print button. "Print / PDF this page" prints the summary and all three statements, one per page.</span></div>'
   +'<div class="fin-page'+(FIN_SHOW_ZERO?' show-zero':'')+'" id="fin-page">'
   +'<div id="fin-ops">'+opsSection()+'</div>'
   +'<div class="section-title" style="margin-top:0">Money at a glance</div>'+F.kpis
   +'<div class="section-title">Financial statements</div>'+F.statements
+  +'<div class="fin-tools fin-foot"><label class="fin-chk"><input type="checkbox" id="fin-zero"'+(FIN_SHOW_ZERO?' checked':'')+'> Show $0 accounts</label>'
+  +'<span class="hint">Hidden rows are accounts with nothing in them for '+FY_YEAR+'.</span></div>'
   +'</div>';
 }
 /* ---------- SHOP OPERATIONS (dashboard summary of PO / Pay / CTK) ---------- */
@@ -490,10 +493,10 @@ function sheetReport(arr,title,subtitle,amountLabel){
     +'<div class="s-sub">'+esc(subtitle)+'</div>'
     +'<table><thead><tr class="s-head"><th>Account</th><th class="num">'+esc(amountLabel)+'</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
-function vPL(){ return topbar('Income Statement','Profit &amp; Loss · Fiscal Year 2026')
-  +sheetReport(DATA.incomeStatement,'C&J AVIATION LLC — Income Statement (P&L)','For the Period Ending: Fiscal Year 2026 (Jan - Dec) · auto-calculated from the General Ledger','Amount (USD)'); }
-function vBS(){ return topbar('Balance Sheet','Assets = Liabilities + Equity · Fiscal Year 2026')
-  +sheetReport(DATA.balanceSheet,'C&J AVIATION LLC — Balance Sheet','As of: Fiscal Year 2026 (Jan - Dec) · Assets = Liabilities + Equity · Balance Check must equal $0.00','Balance (USD)'); }
+function vPL(){ return topbar('Income Statement','Profit &amp; Loss · '+fyLabel())+fyToolsHtml()
+  +sheetReport(DATA.incomeStatement,'C&J AVIATION LLC — Income Statement (P&L)','For the Period Ending: '+fyLabel()+' (Jan - Dec) · auto-calculated from the General Ledger','Amount (USD)'); }
+function vBS(){ return topbar('Balance Sheet','Assets = Liabilities + Equity · '+fyLabel())+fyToolsHtml()
+  +sheetReport(DATA.balanceSheet,'C&J AVIATION LLC — Balance Sheet','As of: '+(fyIsCurrent()?'today':'Dec 31, '+FY_YEAR)+' ('+fyLabel()+') · Assets = Liabilities + Equity · Balance Check must equal $0.00','Balance (USD)'); }
 
 /* ---------- DASHBOARD FINANCIALS (Income Statement + Balance Sheet + Member Equity) ---------- */
 /* Rendered inside vDashboard. Reads the same DATA.incomeStatement / DATA.balanceSheet /
@@ -501,6 +504,35 @@ function vBS(){ return topbar('Balance Sheet','Assets = Liabilities + Equity · 
    the spreadsheet. Each statement has its own Print button that prints just that statement on
    one page (body.fin-print-*), and a collapse chevron remembered in localStorage. */
 var FIN_SHOW_ZERO=false, FIN_COLLAPSED={};
+/* ---- Fiscal-year selector (site 1.6.0 / API 26) ----
+   Statements default to the current year (read straight from the sheet tabs at bootstrap).
+   Picking another year calls getStatements(year), which rebuilds all three statements from the
+   ledger in code, and swaps them into DATA so every view renders unchanged. FY_YEAR is not
+   persisted: a reload comes back on the current year. */
+var FY_YEAR=new Date().getFullYear(), FY_BUSY=false;
+function fyYears(){ var ys=((DATA&&DATA.fyYears)||[]).slice(); if(ys.indexOf(FY_YEAR)===-1) ys.push(FY_YEAR); ys.sort(); return ys; }
+function fyLabel(){ return 'Fiscal Year '+FY_YEAR; }
+function fyIsCurrent(){ return FY_YEAR===new Date().getFullYear(); }
+function fyAsOf(){ return fyIsCurrent()?'As of today':'As of Dec 31, '+FY_YEAR; }
+function fySelectHtml(){
+  var ys=fyYears(); if(ys.length<2) return '';
+  var h='<label class="fy-lab">Fiscal year <select id="fy-sel" class="fy-sel">';
+  for(var i=0;i<ys.length;i++) h+='<option value="'+ys[i]+'"'+(ys[i]===FY_YEAR?' selected':'')+'>'+ys[i]+'</option>';
+  return h+'</select></label>'+(FY_BUSY?'<span class="fy-busy"><span class="spin"></span>Loading '+FY_YEAR+'\u2026</span>':'');
+}
+function fyToolsHtml(hint){ var sel=fySelectHtml(); if(!sel) return ''; return '<div class="fin-tools fy-tools">'+sel+(hint?'<span class="hint">'+hint+'</span>':'')+'</div>'; }
+function wireFY(){ var sel=$('#fy-sel'); if(sel) sel.onchange=function(){ fySet(parseInt(sel.value,10)); }; }
+function fySet(y){ if(!(y>1900)||y===FY_YEAR) return; FY_YEAR=y; FY_BUSY=true; render(current); fyRefresh(); }
+/* Re-pull the statements for FY_YEAR (also used after every ledger edit — see glRefreshReports). */
+function fyRefresh(){
+  google.script.run.withSuccessHandler(function(rep){
+    FY_BUSY=false; if(!rep||!DATA) return;
+    DATA.incomeStatement=rep.incomeStatement; DATA.balanceSheet=rep.balanceSheet; DATA.memberEquity=rep.memberEquity;
+    if(rep.years) DATA.fyYears=rep.years;
+    DATA.tbx=rep.tbx; DATA.salesTax=rep.salesTax; DATA.ledgerUpdated=rep.ledgerUpdated; TBX_SEL=null; TBX_SEL_DATA=null;
+    if(/^(dashboard|pl|bs|equity)$/.test(current)) render(current);
+  }).withFailureHandler(function(e){ FY_BUSY=false; if(/^(dashboard|pl|bs|equity)$/.test(current)) render(current); alert('Could not load '+FY_YEAR+' statements: '+(e.message||e)); }).getStatements(FY_YEAR);
+}
 try{ FIN_SHOW_ZERO=(localStorage.getItem('cj_fin_zero')==='1'); FIN_COLLAPSED=JSON.parse(localStorage.getItem('cj_fin_collapsed')||'{}')||{}; }catch(e){}
 
 function finSections(arr){
@@ -602,7 +634,7 @@ function finBuild(){
   var kpis='<div class="grid fin-kpis" id="fin-kpis">'
     +tile('navy','Revenue',money(rev),esc(finCap(mix.slice(0,2).join(' · '))))
     +tile('ok','Gross Profit',money(gp),finPct(gp,rev)+' margin · OpEx '+finPct(opex,rev)+' of revenue')
-    +tile(net<0?'red':'ok','Net Income','<span class="'+(net<0?'neg':'pos')+'">'+money(net)+'</span>',net<0?'Loss YTD':'Profit YTD')
+    +tile(net<0?'red':'ok','Net Income','<span class="'+(net<0?'neg':'pos')+'">'+money(net)+'</span>',net<0?(fyIsCurrent()?'Loss YTD':'Loss for '+FY_YEAR):(fyIsCurrent()?'Profit YTD':'Profit for '+FY_YEAR))
     +tile('navy','Cash on hand',money(cash),esc(finCap(cashItems.join(' + '))))
     +tile('','Owed to us',money(ar),'Accounts receivable')
     +tile(owedOut>0?'warn':'','Owed out','<span class="neg" id="fin-owed">'+money(owedOut)+'</span>','<span id="fin-owed-foot">'+finOwedFoot(amex,sales,null)+'</span>')
@@ -612,7 +644,7 @@ function finBuild(){
   var cogsNote={}; if(sCogs.items.length===1){ var ps=0; for(var p=0;p<sRev.items.length;p++) if(/parts/i.test(sRev.items[p].label)) ps+=sRev.items[p].value; if(ps) cogsNote[sCogs.items[0].label]=finPct(cogs,ps)+' of parts sales'; }
   var pl='<section class="card fin-card'+(FIN_COLLAPSED['pl']?' collapsed':'')+'" id="fin-pl">'
     +'<div class="fin-phead">'+printHead('Income Statement (P&L)')+'</div>'
-    +finCardHead('Income Statement','Profit &amp; Loss · Fiscal Year 2026 (Jan – Dec) · from the General Ledger','pl')
+    +finCardHead('Income Statement','Profit &amp; Loss · '+fyLabel()+' (Jan – Dec) · from the General Ledger','pl')
     +'<div class="fin-body">'
     +finBridge(rev,cogs,gp,opex,net)
     +finSecHead(sRev.name||'Revenue',rev)+finRows(sRev.items)
@@ -628,7 +660,7 @@ function finBuild(){
   var liabList=[]; for(var l=0;l<sLia.items.length;l++) liabList.push([sLia.items[l].label.replace(/ Credit Card$/,''),sLia.items[l].value,'']);
   var bs='<section class="card fin-card'+(FIN_COLLAPSED['bs']?' collapsed':'')+'" id="fin-bs">'
     +'<div class="fin-phead">'+printHead('Balance Sheet')+'</div>'
-    +finCardHead('Balance Sheet','As of today · what we own vs. what we owe','bs')
+    +finCardHead('Balance Sheet',fyAsOf()+' · what we own vs. what we owe','bs')
     +'<div class="fin-body">'
     +'<div class="fin-bsviz"><div class="fin-stack"><div class="lbl">Assets · '+finK(assets)+'</div>'+segs([['Equipment & other',other,' s-fixed'],['A/R',ar,' s-ar'],['Cash',cash,' s-cash']],'')+'</div>'
     +'<div class="fin-stack"><div class="lbl">Liabilities + Equity · '+finK(le)+'</div>'+segs([['Equity',eq,' s-eq']].concat(liabList.map(function(x){ return [x[0],x[1],' s-liab']; })),'')+'</div></div>'
@@ -653,7 +685,7 @@ function finBuild(){
   }
   var me='<section class="card fin-card'+(FIN_COLLAPSED['eq']?' collapsed':'')+'" id="fin-eq">'
     +'<div class="fin-phead">'+printHead('Member Equity')+'</div>'
-    +finCardHead('LLC Member Equity','50 / 50 ownership · net income allocated equally per the Operating Agreement','eq')
+    +finCardHead('LLC Member Equity',fyLabel()+' · 50 / 50 ownership · net income allocated equally per the Operating Agreement','eq')
     +'<div class="fin-body">'
     +(head>=0
       ? '<div class="fin-eqhead"><div>Equity component</div><div>'+esc(names[0])+'</div><div>'+esc(names[1])+'</div><div>'+esc(names[2])+'</div></div>'+eqRows
@@ -664,7 +696,7 @@ function finBuild(){
 }
 function finClearPrint(){ document.body.classList.remove('fin-print-pl','fin-print-bs','fin-print-eq'); }
 function wireFin(){
-  finClearPrint();
+  finClearPrint(); wireFY();
   var cb=$('#fin-zero');
   if(cb) cb.onchange=function(){ FIN_SHOW_ZERO=cb.checked; try{ localStorage.setItem('cj_fin_zero',cb.checked?'1':'0'); }catch(e){}
     var pg=$('#fin-page'); if(pg) pg.classList.toggle('show-zero',cb.checked); };
@@ -688,7 +720,7 @@ function vEquity(){
 
   var head=-1;
   for(var i=0;i<g.length;i++){ if(String(g[i][0]).indexOf('Equity Component')===0){ head=i; break; } }
-  var html=topbar('LLC Member Equity','50 / 50 ownership · auto-calculated from the ledger')+'<div class="card"><table class="rpt"><thead><tr>';
+  var html=topbar('LLC Member Equity',fyLabel()+' · 50 / 50 ownership · auto-calculated from the ledger')+fyToolsHtml()+'<div class="card"><table class="rpt"><thead><tr>';
   if(head>=0){ for(var c=0;c<4;c++) html+='<th'+(c>0?' class="num"':'')+'>'+esc(String(g[head][c]).replace(/\n/g,' '))+'</th>'; }
   html+='</tr></thead><tbody>';
   for(var r=head+1;r<g.length;r++){
@@ -914,14 +946,7 @@ function glDelete(rowNum){
     .withFailureHandler(function(e){ alert('Could not delete: '+(e.message||e)); })
     .deleteTransactionAndReload(txn);
 }
-function glRefreshReports(){
-  google.script.run.withSuccessHandler(function(rep){
-    if(!rep||!DATA) return;
-    DATA.incomeStatement=rep.incomeStatement; DATA.balanceSheet=rep.balanceSheet;
-    DATA.tbx=rep.tbx; DATA.salesTax=rep.salesTax; DATA.memberEquity=rep.memberEquity;
-    DATA.ledgerUpdated=rep.ledgerUpdated; TBX_SEL=null; TBX_SEL_DATA=null;
-  }).withFailureHandler(function(){}).getReports();
-}
+function glRefreshReports(){ fyRefresh(); }   /* statements for the selected fiscal year (API 26) */
 function bannerHtml(){
   if(!LEDGER_CACHE) return '';
   var rc=reviewCount();
@@ -1289,6 +1314,13 @@ function catOptions(){
   var h=''; for(var g=0;g<order.length;g++){ h+='<optgroup label="'+esc(order[g])+'">'; var it=byType[order[g]]; for(var k=0;k<it.length;k++) h+='<option value="'+esc(it[k].name)+'" data-code="'+esc(it[k].code)+'">'+esc(it[k].code)+' · '+esc(it[k].name)+'</option>'; h+='</optgroup>'; }
   return h;
 }
+/* Adjustment entries may touch any two live accounts (money or category) — grouped by type. */
+function allEntryOptions(){
+  var A=DATA.accounts, byType={}, order=[];
+  for(var i=0;i<A.length;i++){ if(A[i].archived || A[i].type==='Review' || A[i].name==='REVIEW' || A[i].name==='UNCATEGORIZED' || A[i].name==='Transfer') continue; var t=A[i].type||'Other'; if(!byType[t]){byType[t]=[];order.push(t);} byType[t].push(A[i]); }
+  var h=''; for(var g=0;g<order.length;g++){ h+='<optgroup label="'+esc(order[g])+'">'; var it=byType[order[g]]; for(var k=0;k<it.length;k++) h+='<option value="'+esc(it[k].name)+'" data-code="'+esc(it[k].code)+'">'+esc(it[k].code)+' · '+esc(it[k].name)+'</option>'; h+='</optgroup>'; }
+  return h;
+}
 function selCode(sel){ var o=sel.options[sel.selectedIndex]; return o?(o.getAttribute('data-code')||''):''; }
 function vEntry(){
   var today=new Date().toISOString().slice(0,10);
@@ -1296,7 +1328,7 @@ function vEntry(){
   +'<div id="flash"></div><div class="grid g2">'
   +'<div class="card pad">'
     +'<div class="form-row"><div><label>Date</label><input type="date" id="f-date" value="'+today+'"></div><div><label>Amount (USD)</label><input type="number" id="f-amt" placeholder="0.00" step="0.01" min="0"></div></div>'
-    +'<div style="margin-bottom:16px"><label>Type</label><select id="f-type"><option value="out">Expense — money out</option><option value="in">Income — money in</option><option value="transfer">Transfer — between your accounts</option></select></div>'
+    +'<div style="margin-bottom:16px"><label>Type</label><select id="f-type"><option value="out">Expense — money out</option><option value="in">Income — money in</option><option value="transfer">Transfer — between your accounts</option><option value="adj">Adjustment — journal entry (any two accounts)</option></select></div>'
     +'<div style="margin-bottom:16px"><label>Description</label><input id="f-desc" placeholder="e.g. Aircraft Spruce — brake parts"></div>'
     +'<div class="form-row"><div><label>Reference #</label><input id="f-ref" placeholder="Invoice, PO, Venmo txn ID…"><div class="hint">Optional · ledger column D</div></div>'
     +'<div><label>Notes / Tail #</label><input id="f-notes" placeholder="e.g. N3115W / Invoice 1033"><div class="hint">Optional · ledger column G</div></div></div>'
@@ -1318,6 +1350,9 @@ function wireEntry(){
     if(t==='transfer'){ labA.textContent='From account'; hintA.textContent='Money leaves here'; labB.textContent='To account'; hintB.textContent='Money arrives here';
       selB.innerHTML=moneyOptions(); if(selB.options.length>1) selB.selectedIndex=1;
       note.textContent='Writes two Transfer rows (Credit from · Debit to) with a shared Transaction ID and Pending status.';
+    }else if(t==='adj'){ labA.textContent='Debit account'; hintA.textContent='Any account · money or category'; labB.textContent='Credit account'; hintB.textContent='Any account · money or category';
+      selA.innerHTML=allEntryOptions(); selB.innerHTML=allEntryOptions(); if(selB.options.length>1) selB.selectedIndex=1;
+      note.textContent='Writes two ADJ rows (Debit · Credit) with a shared Transaction ID and Cleared status. Use it for corrections, write-offs and reclasses that never touched a bank account.';
     }else{ labA.textContent='Money account'; hintA.textContent='What the money moved through'; labB.textContent='Category account'; hintB.textContent='From your Chart of Accounts';
       selB.innerHTML=catOptions(); note.textContent='Writes two rows (Financial + Category) to your General Ledger with a shared Transaction ID, Source, and Pending status.'; }
   }
@@ -1326,6 +1361,7 @@ function wireEntry(){
     if(!(a>0)){ prev.innerHTML='<div class="hint">Enter an amount to see the double-entry it will post.</div>'; chk.innerHTML=''; post.disabled=true; return; }
     var aName=selA.value, bName=selB.value, drAcct, crAcct;
     if(t==='transfer'){ if(aName===bName){ prev.innerHTML='<div class="hint">Choose two different accounts.</div>'; chk.innerHTML='<span class="neg">From and To must differ.</span>'; post.disabled=true; return; } drAcct=bName; crAcct=aName; }
+    else if(t==='adj'){ if(aName===bName){ prev.innerHTML='<div class="hint">Choose two different accounts.</div>'; chk.innerHTML='<span class="neg">Debit and Credit must differ.</span>'; post.disabled=true; return; } drAcct=aName; crAcct=bName; }
     else if(t==='out'){ drAcct=bName; crAcct=aName; } else { drAcct=aName; crAcct=bName; }
     prev.innerHTML='<div class="ln"><span>'+esc(drAcct)+'</span><span class="dr">Debit '+money(a)+'</span></div><div class="ln"><span>'+esc(crAcct)+'</span><span class="cr">Credit '+money(a)+'</span></div>';
     chk.innerHTML='<span class="pos">⚖ Balanced — debits '+money(a)+' = credits '+money(a)+'</span>'; post.disabled=false;
@@ -1334,10 +1370,12 @@ function wireEntry(){
   [amt,selA,selB,desc].forEach(function(el){ el.addEventListener('input',refresh); });
   post.onclick=function(){
     var a=parseFloat(amt.value); if(!(a>0)) return; var t=type.value;
-    if(t==='transfer' && selA.value===selB.value) return;
+    if((t==='transfer'||t==='adj') && selA.value===selB.value) return;
     post.disabled=true; post.textContent='Posting…';
     var payload = (t==='transfer')
       ? { date:date.value, amount:a, desc:desc.value, ref:ref.value, notes:notes.value, direction:'transfer', fromAccount:{code:selCode(selA),name:selA.value}, toAccount:{code:selCode(selB),name:selB.value} }
+      : (t==='adj')
+      ? { date:date.value, amount:a, desc:desc.value, ref:ref.value, notes:notes.value, direction:'adj', debitAccount:{code:selCode(selA),name:selA.value}, creditAccount:{code:selCode(selB),name:selB.value} }
       : { date:date.value, amount:a, desc:desc.value, ref:ref.value, notes:notes.value, direction:t, moneyAccount:{code:selCode(selA),name:selA.value}, categoryAccount:{name:selB.value} };
     google.script.run
       .withSuccessHandler(function(res){ LEDGER_CACHE=null; render('entry');

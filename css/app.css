@@ -597,6 +597,11 @@
 .fin-tools .hint{margin:0}
 .fin-chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;white-space:nowrap}
 .fin-chk input{width:auto;margin:0}
+.fy-lab{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--navy);white-space:nowrap;text-transform:none;letter-spacing:0;margin:0}
+.fy-sel{width:auto;padding:6px 30px 6px 10px;font-size:13px;font-weight:600}
+.fy-busy{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)} .fy-busy .spin{width:14px;height:14px;border-width:2px;margin:0}
+.fy-tools{margin:-8px 0 14px}
+.fin-foot{margin:18px 0 0;padding-top:12px;border-top:1px solid var(--cream-d)}
 .fin-kpis{grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px}
 .fin-kpis .tile{padding:12px 12px 12px 16px}
 .fin-kpis .tile .val.small{font-size:19px;white-space:nowrap;font-variant-numeric:tabular-nums}
