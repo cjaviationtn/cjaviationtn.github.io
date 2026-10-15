@@ -1444,7 +1444,8 @@ function paintPO(){
   var newBtn='<div class="actions"><button class="btn gold" id="po-newtoggle">＋ New Purchase Order</button>'
     + '<button class="btn ghost" id="po-import">⤒ Import invoice PDF</button>'
     + '<input type="file" id="po-impfile" accept="application/pdf,.pdf" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">'
-    + '<span class="pill">Next number: <b>'+esc(d.nextPO)+'</b></span></div>';
+    + '<span class="pill">Next number: <b>'+esc(d.nextPO)+'</b>'
+    + ' <button class="btn ghost" id="po-copynext" type="button" title="Copy next PO number" data-po="'+esc(d.nextPO)+'" style="padding:2px 8px;font-size:11px;width:auto;margin-left:6px">Copy</button></span></div>';
 
   var today=new Date().toISOString().slice(0,10);
   var typeOpts=''; for(var i=0;i<PO_TYPES.length;i++) typeOpts+='<option value="'+PO_TYPES[i]+'">'+PO_TYPES[i]+'</option>';
@@ -1623,6 +1624,7 @@ function poDownloadPdf(row, btn){
     .poPdf(row);
 }
 function wirePO(){
+  var cpn=$('#po-copynext'); if(cpn) cpn.onclick=function(){ payCopy_(cpn.getAttribute('data-po'), cpn); };
   var t=$('#po-newtoggle'); if(t) t.onclick=function(){ PO_SHOW_NEW=!PO_SHOW_NEW; if(PO_SHOW_NEW) PO_NEW_ITEMS=null; paintPO(); };
   var cn=$('#po-cancelnew'); if(cn) cn.onclick=function(){ PO_SHOW_NEW=false; PO_NEW_ITEMS=null; paintPO(); };
   if(PO_SHOW_NEW){ poRenderItems(); var ai=$('#po-additem'); if(ai) ai.onclick=function(){ if(!PO_NEW_ITEMS) PO_NEW_ITEMS=[]; PO_NEW_ITEMS.push({qty:'',part:'',desc:'',price:''}); poRenderItems(); }; }
