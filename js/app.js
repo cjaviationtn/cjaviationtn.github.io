@@ -2488,6 +2488,31 @@ function payBalFor(name){ var s=PAY_CACHE.summary; for(var i=0;i<s.length;i++) i
 function payD(iso){ if(!iso) return ''; var p=String(iso).split('-'); if(p.length!==3) return iso; return p[1].replace(/^0/,'')+'/'+p[2].replace(/^0/,'')+'/'+p[0]; }
 function payM(n){ return money(n)||'$0.00'; }
 
+/* Next automatic raise, mirrors payProgressionCheck in Pay backend.gs (added 10/15/2026).
+   A&P: +$5 every 6 months to $55, then +$5 every 12 months. Apprentice: +$2.50 every 12 months, tops out at $20.
+   Counted from Last Raise (M/d/yyyy text from the sheet). Display only; the backend makes the change. */
+function payNextRaise_(s){
+  var role=String(s.role||'').toLowerCase(), scale='';
+  if(role.indexOf('apprentice')>-1) scale='apprentice'; else if(/a\s*(&|and)\s*p/.test(role)) scale='ap';
+  if(!scale) return null;
+  var rate=Number(s.rate); if(!(rate>0)) return null;
+  if(scale==='apprentice' && rate>=20) return {top:true};
+  var m=String(s.raise||'').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); if(!m) return null;
+  var months = (scale==='ap' && rate<55) ? 6 : 12;
+  var to = scale==='ap' ? (rate>=55 ? rate+5 : Math.min(rate+5,55)) : Math.min(rate+2.5,20);
+  var y=+m[3], mo=+m[1]-1+months, d=+m[2];
+  var ny=y+Math.floor(mo/12), nm=((mo%12)+12)%12, last=new Date(ny,nm+1,0).getDate();
+  var dt=new Date(ny,nm,Math.min(d,last));
+  var days=Math.round((dt-new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate()))/86400000);
+  return {date:(nm+1)+'/'+Math.min(d,last)+'/'+ny, to:to, days:days};
+}
+function payNextRaiseHtml_(s){
+  var n=payNextRaise_(s); if(!n) return '<span style="color:var(--muted)">—</span>';
+  if(n.top) return '<span style="color:var(--muted)">Topped out</span>';
+  var soon=n.days<=30;
+  return '<span class="pay-next'+(soon?' soon':'')+'" title="'+(n.days<=0?'Due now':n.days+' days')+'">'+esc(n.date)+' → '+money(n.to)+'</span>';
+}
+
 function paintPay(){
   var d=PAY_CACHE, w=$('#pay-wrap'); if(!w) return;
   if(PAY_MSG){ var f=$('#pay-flash'); if(f) f.innerHTML='<div class="flash ok">'+(PAY_MSG_HTML?PAY_MSG:esc(PAY_MSG))+'</div>'; PAY_MSG=null; PAY_MSG_HTML=false; }
@@ -2527,6 +2552,7 @@ function paintPay(){
     var dates = [];
     if(s.hire) dates.push('Hired '+esc(s.hire));
     if(s.raise) dates.push('Raise '+esc(s.raise));
+    var nx=payNextRaise_(s); if(nx && !nx.top) dates.push('Next '+esc(nx.date)+' \u2192 '+money(nx.to)); else if(nx && nx.top) dates.push('Topped out');
     narrow += '<div class="sum-card"><div class="sum-top">'
       + '<span class="sum-name">'+esc(s.name)+'</span><span>'+bal+'</span></div>'
       + '<div class="sum-meta">'+meta.join(' \u00b7 ')
@@ -2534,14 +2560,14 @@ function paintPay(){
       + (dates.length ? '<br>'+dates.join(' \u00b7 ') : '')
       + '</div></div>';
     body+='<tr><td style="font-weight:700">'+esc(s.name)+'</td>'
-      + '<td>'+esc(s.role||'')+'</td><td class="num">'+esc(s.hire||'')+'</td><td class="num">'+esc(s.raise||'')+'</td>'
+      + '<td>'+esc(s.role||'')+'</td><td class="num">'+esc(s.hire||'')+'</td><td class="num">'+esc(s.raise||'')+'</td><td class="num">'+payNextRaiseHtml_(s)+'</td>'
       + '<td class="num">'+(s.rate!==''?money(s.rate):'')+'</td>'
       + '<td class="num">'+money(s.earned)+'</td><td class="num">'+money(s.paid)+'</td>'
       + '<td class="num"'+(s.balance>0.005?' style="color:var(--warn);font-weight:800"':'')+'>'+payM(s.balance)+'</td>'
       + '<td class="num">'+(s.hours||0).toFixed(2)+'</td></tr>';
   }
-  body+='<tr class="tot"><td>TOTAL</td><td></td><td></td><td></td><td></td><td class="num">'+money(t.earned)+'</td><td class="num">'+money(t.paid)+'</td><td class="num">'+payM(t.balance)+'</td><td class="num">'+(t.hours||0).toFixed(2)+'</td></tr>';
-  var summary='<div class="card pad" style="margin-bottom:18px"><div class="section-title" style="margin-top:0">Summary by employee</div><div class="pay-sum-wide"><div class="scroll"><table class="tb" style="table-layout:fixed;min-width:860px"><thead><tr><th style="width:17%">Employee</th><th style="width:12%">Role / Notes</th><th class="num" style="width:11%">Hire Date</th><th class="num" style="width:11%">Last Raise</th><th class="num" style="width:10%">Rate</th><th class="num" style="width:11%">Earned</th><th class="num" style="width:11%">Paid</th><th class="num" style="width:9%">Balance</th><th class="num" style="width:8%">Hours</th></tr></thead><tbody>'+body+'</tbody></table></div></div>'
+  body+='<tr class="tot"><td>TOTAL</td><td></td><td></td><td></td><td></td><td></td><td class="num">'+money(t.earned)+'</td><td class="num">'+money(t.paid)+'</td><td class="num">'+payM(t.balance)+'</td><td class="num">'+(t.hours||0).toFixed(2)+'</td></tr>';
+  var summary='<div class="card pad" style="margin-bottom:18px"><div class="section-title" style="margin-top:0">Summary by employee</div><div class="pay-sum-wide"><div class="scroll"><table class="tb" style="table-layout:fixed;min-width:960px"><thead><tr><th style="width:14%">Employee</th><th style="width:10%">Role / Notes</th><th class="num" style="width:10%">Hire Date</th><th class="num" style="width:10%">Last Raise</th><th class="num" style="width:15%">Next Raise</th><th class="num" style="width:8%">Rate</th><th class="num" style="width:10%">Earned</th><th class="num" style="width:10%">Paid</th><th class="num" style="width:7%">Balance</th><th class="num" style="width:6%">Hours</th></tr></thead><tbody>'+body+'</tbody></table></div></div>'
     + '<div class="pay-sum-narrow">'+narrow
     + '<div class="sum-tot"><span>TOTAL</span><span>'+payM(t.balance)+' owed \u00b7 '+(t.hours||0).toFixed(2)+' hrs</span></div></div></div>';
 

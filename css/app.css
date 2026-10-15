@@ -78,6 +78,8 @@
   .tile .foot{font-size:12px;color:var(--muted);margin-top:6px}
   .pos{color:var(--ok)} .neg{color:var(--bad)} .warnc{color:var(--warn)}
   .pay-sum-narrow{display:none}
+  .pay-next{display:inline-block;background:#e8eef4;color:#2B4865;border-radius:6px;padding:2px 7px;font-size:12px;white-space:nowrap}
+  .pay-next.soon{background:#E9B97A;color:#412402;font-weight:700}
     .sum-card{border-bottom:1px solid var(--line);padding-bottom:9px;margin-bottom:9px}
     .sum-card:last-of-type{border-bottom:0}
     .sum-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
