@@ -2493,14 +2493,14 @@ function payM(n){ return money(n)||'$0.00'; }
    Counted from Last Raise (M/d/yyyy text from the sheet). Display only; the backend makes the change. */
 function payNextRaise_(s){
   var role=String(s.role||'').toLowerCase(), scale='';
-  if(role.indexOf('apprentice')>-1) scale='apprentice'; else if(/a\s*(&|and)\s*p/.test(role)) scale='ap';
+  if(role.indexOf('apprentice')>-1) scale='apprentice'; else if(/\ba\s*(&|and)\s*p\b/.test(role)) scale='ap';
   if(!scale) return null;
   var rate=Number(s.rate); if(!(rate>0)) return null;
   if(scale==='apprentice' && rate>=20) return {top:true};
-  var m=String(s.raise||'').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); if(!m) return null;
+  var m=String(s.raise||'').match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/); if(!m) return null;
   var months = (scale==='ap' && rate<55) ? 6 : 12;
   var to = scale==='ap' ? (rate>=55 ? rate+5 : Math.min(rate+5,55)) : Math.min(rate+2.5,20);
-  var y=+m[3], mo=+m[1]-1+months, d=+m[2];
+  var y=+m[3]; if(y<100) y+=2000; var mo=+m[1]-1+months, d=+m[2];
   var ny=y+Math.floor(mo/12), nm=((mo%12)+12)%12, last=new Date(ny,nm+1,0).getDate();
   var dt=new Date(ny,nm,Math.min(d,last));
   var days=Math.round((dt-new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate()))/86400000);
