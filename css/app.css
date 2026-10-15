@@ -757,6 +757,9 @@
 /* Phone drawer: bigger type (Joel, 22 Sep — the slide-out menu was too small to read) */
 @media(max-width:900px){
   .side,.app.narrow .side{width:300px}
+  .side .brand,.app.narrow .side .brand{justify-content:flex-start;gap:12px;padding:18px 16px 16px}
+  .side .brand .logo-badge,.app.narrow .side .brand .logo-badge{width:54px;height:54px;flex:0 0 54px}
+  .side .brand .btxt{min-width:0}
   .side .brand h1{font-size:19px} .side .brand .tagline{font-size:10.5px} .side .brand .subtag{font-size:13.5px}
   .side .nav button,.app.narrow .side .nav button{font-size:17.5px;padding:15px 20px;gap:14px}
   .side .nav .ico,.app.narrow .side .nav .ico{width:24px;font-size:19px}
