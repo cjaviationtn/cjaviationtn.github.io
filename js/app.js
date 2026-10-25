@@ -2508,7 +2508,24 @@ function payNextRaise_(s){
   var days=Math.round((dt-new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate()))/86400000);
   return {date:(nm+1)+'/'+Math.min(d,last)+'/'+ny, to:to, days:days};
 }
+/* Review-and-approve (10/24/2026): the backend sends s.review = {state, due, to, from, held, nextIfHeld}.
+   state: scheduled | soon (review within 7 days) | ready (Approve / Hold) | top. Older backends send no
+   .review, so the date-only display below is the fallback until the new API version is deployed. */
+function payReviewHtml_(s, narrow){
+  var r=s.review; if(!r) return '<span style="color:var(--muted)">—</span>';
+  if(r.state==='top') return '<span style="color:var(--muted)">Topped out</span>';
+  var to=money(r.to), nm=esc(s.name);
+  if(r.state==='ready'){
+    return '<span class="pay-rv"><span class="pay-next ready" title="Review date '+esc(r.due)+'">Review '+esc(r.due)+' → '+to+'</span>'
+      + '<button class="btn sm pay-rv-btn" data-papprove="'+nm+'" data-to="'+esc(String(r.to))+'" data-from="'+esc(String(r.from))+'">Approve</button>'
+      + '<button class="btn sm ghost pay-rv-btn" data-phold="'+nm+'" data-next="'+esc(r.nextIfHeld)+'">Hold</button></span>';
+  }
+  var held = r.held ? '<span class="pay-held">held '+esc(r.held)+'</span>' : '';
+  if(r.state==='soon') return '<span class="pay-next soon" title="Review due within 7 days">Review due '+esc(r.due)+' → '+to+'</span>'+held;
+  return '<span class="pay-next">'+esc(r.due)+' → '+to+'</span>'+held;
+}
 function payNextRaiseHtml_(s){
+  if(s.review!==undefined) return payReviewHtml_(s);
   var n=payNextRaise_(s); if(!n) return '<span style="color:var(--muted)">—</span>';
   if(n.top) return '<span style="color:var(--muted)">Topped out</span>';
   var soon=n.days<=30;
@@ -2554,7 +2571,8 @@ function paintPay(){
     var dates = [];
     if(s.hire) dates.push('Hired '+esc(s.hire));
     if(s.raise) dates.push('Raise '+esc(s.raise));
-    var nx=payNextRaise_(s); if(nx && !nx.top) dates.push('Next '+esc(nx.date)+' \u2192 '+money(nx.to)); else if(nx && nx.top) dates.push('Topped out');
+    if(s.review!==undefined){ if(s.review) dates.push('Next raise '+payReviewHtml_(s,true)); }
+    else { var nx=payNextRaise_(s); if(nx && !nx.top) dates.push('Next '+esc(nx.date)+' \u2192 '+money(nx.to)); else if(nx && nx.top) dates.push('Topped out'); }
     narrow += '<div class="sum-card"><div class="sum-top">'
       + '<span class="sum-name">'+esc(s.name)+'</span><span>'+bal+'</span></div>'
       + '<div class="sum-meta">'+meta.join(' \u00b7 ')
@@ -2569,7 +2587,7 @@ function paintPay(){
       + '<td class="num">'+(s.hours||0).toFixed(2)+'</td></tr>';
   }
   body+='<tr class="tot"><td>TOTAL</td><td></td><td></td><td></td><td></td><td></td><td class="num">'+money(t.earned)+'</td><td class="num">'+money(t.paid)+'</td><td class="num">'+payM(t.balance)+'</td><td class="num">'+(t.hours||0).toFixed(2)+'</td></tr>';
-  var summary='<div class="card pad" style="margin-bottom:18px"><div class="section-title" style="margin-top:0">Summary by employee</div><div class="pay-sum-wide"><div class="scroll"><table class="tb" style="table-layout:fixed;min-width:960px"><thead><tr><th style="width:14%">Employee</th><th style="width:10%">Role / Notes</th><th class="num" style="width:10%">Hire Date</th><th class="num" style="width:10%">Last Raise</th><th class="num" style="width:15%">Next Raise</th><th class="num" style="width:8%">Rate</th><th class="num" style="width:10%">Earned</th><th class="num" style="width:10%">Paid</th><th class="num" style="width:7%">Balance</th><th class="num" style="width:6%">Hours</th></tr></thead><tbody>'+body+'</tbody></table></div></div>'
+  var summary='<div class="card pad" style="margin-bottom:18px"><div class="section-title" style="margin-top:0">Summary by employee</div><div class="pay-sum-wide"><div class="scroll"><table class="tb" style="table-layout:fixed;min-width:1000px"><thead><tr><th style="width:13%">Employee</th><th style="width:9%">Role / Notes</th><th class="num" style="width:9%">Hire Date</th><th class="num" style="width:9%">Last Raise</th><th class="num" style="width:22%">Next Raise</th><th class="num" style="width:8%">Rate</th><th class="num" style="width:9%">Earned</th><th class="num" style="width:9%">Paid</th><th class="num" style="width:7%">Balance</th><th class="num" style="width:5%">Hours</th></tr></thead><tbody>'+body+'</tbody></table></div></div>'
     + '<div class="pay-sum-narrow">'+narrow
     + '<div class="sum-tot"><span>TOTAL</span><span>'+payM(t.balance)+' owed \u00b7 '+(t.hours||0).toFixed(2)+' hrs</span></div></div></div>';
 
@@ -2845,6 +2863,18 @@ var jb=$('#pay-job'); if(jb) jb.onclick=function(){ PAY_PANEL=(PAY_PANEL==='job'
 
   var teds=document.querySelectorAll('[data-ptedit]');
   for(var a=0;a<teds.length;a++) teds[a].onclick=function(){ PAY_TEDIT=parseInt(this.getAttribute('data-ptedit'),10); PAY_PANEL=null; paintPay(); };
+  var apv=document.querySelectorAll('[data-papprove]');
+  for(var ap=0;ap<apv.length;ap++) apv[ap].onclick=function(){
+    var n=this.getAttribute('data-papprove'), from=money(Number(this.getAttribute('data-from'))), to=money(Number(this.getAttribute('data-to')));
+    if(!confirm('Approve '+n+'\'s raise: '+from+' \u2192 '+to+'/hr, starting today?\n\nOnly approve after a satisfactory performance review. Hours already logged before today keep the old rate.')) return;
+    payRun('payApproveRaise',n,undefined,'\u2713 '+n+' approved: '+to+'/hr starting today.',this);
+  };
+  var hld=document.querySelectorAll('[data-phold]');
+  for(var hd=0;hd<hld.length;hd++) hld[hd].onclick=function(){
+    var n=this.getAttribute('data-phold'), nx=this.getAttribute('data-next');
+    if(!confirm('Put '+n+'\'s raise on hold?\n\nTheir rate stays the same. The raise comes up again at the next scheduled review'+(nx?' on '+nx:'')+'.')) return;
+    payRun('payHoldRaise',n,undefined,'\u2713 '+n+'\'s raise is on hold until the next review'+(nx?' ('+nx+')':'')+'.',this);
+  };
   var tdels=document.querySelectorAll('[data-ptdel]');
   for(var b=0;b<tdels.length;b++) tdels[b].onclick=function(){ var row=parseInt(this.getAttribute('data-ptdel'),10); if(!confirm('Delete this time entry?')) return; payRun('payDeleteTime',row,undefined,'✓ Time entry deleted.',this); };
   var tcancel=document.querySelector('[data-ptcancel]'); if(tcancel) tcancel.onclick=function(){ PAY_TEDIT=null; paintPay(); };
