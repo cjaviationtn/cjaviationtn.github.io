@@ -2516,7 +2516,7 @@ function payReviewHtml_(s, narrow){
   if(r.state==='top') return '<span style="color:var(--muted)">Topped out</span>';
   var to=money(r.to), nm=esc(s.name);
   if(r.state==='ready'){
-    return '<span class="pay-rv"><span class="pay-next ready" title="Review date '+esc(r.due)+'">Review '+esc(r.due)+' → '+to+'</span>'
+    return '<span class="pay-rv"><span class="pay-next ready" title="Review date '+esc(r.due)+'">Ready '+esc(r.due)+' → '+to+'</span>'
       + '<button class="btn sm pay-rv-btn" data-papprove="'+nm+'" data-to="'+esc(String(r.to))+'" data-from="'+esc(String(r.from))+'">Approve</button>'
       + '<button class="btn sm ghost pay-rv-btn" data-phold="'+nm+'" data-next="'+esc(r.nextIfHeld)+'">Hold</button></span>';
   }
