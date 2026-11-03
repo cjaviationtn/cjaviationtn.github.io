@@ -436,7 +436,7 @@ function actionsBar(){
   var A=DATA.dashboardActions||[];
   var h='<div id="act-flash"></div>';
   h+='<div class="actions"><button class="btn" id="gl-new" onclick="render(\'entry\')">＋ New transaction</button>';
-  for(var k=0;k<A.length;k++) h+='<button class="'+A[k].style+'" data-fn="'+esc(A[k].fn)+'" data-confirm="'+(A[k].confirm?'1':'')+'" data-prompt="'+esc(A[k].promptText||'')+'" data-label="'+esc(A[k].label)+'">'+esc(A[k].label)+'</button>';
+  for(var k=0;k<A.length;k++) h+='<button class="'+A[k].style+(/^import transactions/i.test(A[k].label||'')?' maroon':'')+'" data-fn="'+esc(A[k].fn)+'" data-confirm="'+(A[k].confirm?'1':'')+'" data-prompt="'+esc(A[k].promptText||'')+'" data-label="'+esc(A[k].label)+'">'+esc(A[k].label)+'</button>';
   return h+'</div>';
 }
 function wireActions(){

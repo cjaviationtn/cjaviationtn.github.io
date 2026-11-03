@@ -2,6 +2,7 @@
     --navy:#2B4865; --navy-d:#1F3549; --navy-l:#3A5A7C;
     --cream:#F4F6F8; --cream-d:#E4E9EE;
     --red:#BB4A3C; --red-d:#9E3C30;
+    --maroon:#AB4044; --maroon-d:#8E3337;   /* sampled from img/logo.png */
     --gold:#E9B97A; --gold-d:#D9A55E;
     --ink:#25313d; --muted:#6b7885; --line:#dde3e9;
     --ok:#3f8f5f; --warn:#c9922f; --bad:#c0472f;
@@ -158,6 +159,7 @@
   .btn:hover{background:var(--navy-d)} .btn:disabled{opacity:.5;cursor:not-allowed}
   .btn.ghost{background:#fff;color:var(--navy);border:1px solid var(--line)} .btn.ghost:hover{background:var(--cream)}
   .btn.gold{background:var(--gold);color:var(--navy-d)} .btn.gold:hover{background:var(--gold-d)}
+  .btn.maroon{background:var(--maroon);color:#fff} .btn.maroon:hover{background:var(--maroon-d)}   /* logo maroon — Import transactions (site 1.6.17) */
   .btn.danger{background:#fff;color:var(--bad);border:1px solid #e3c3bc} .btn.danger:hover{background:#fbeeeb}
   .btn.sm{padding:8px 12px;font-size:12px;border-radius:8px}
   .vr-edit input,.vr-edit select{padding:6px 8px;font-size:12px}
