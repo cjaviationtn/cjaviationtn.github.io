@@ -1788,7 +1788,8 @@ function poImpKey(s){ return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,''
 
 /* ---- Aircraft Spruce ---- */
 /* Pull the item / part number out of an invoice description.
-   1) First word, when it looks like a part number (Aircraft Spruce prints the item # first).
+   0) Aircraft Spruce only: their Part# format NN-NNNNN anywhere in the line.
+   1) First word, when it looks like a part number.
    2) Otherwise a standard AN / MS / NAS number anywhere in the line.
    3) Otherwise the last word that looks like a part number (e.g. CLEVELAND BLEEDER SCREW 079-00300). */
 function poImpIsPartTok(w){
@@ -1802,10 +1803,12 @@ function poImpIsPartTok(w){
   if(/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(w)) return false;        /* dates */
   return /^[A-Z0-9][A-Z0-9\-\/\.]*[A-Z0-9]$/i.test(w);
 }
-function poImpSplitPart(desc){
+function poImpSplitPart(desc, spruce){
   var s=String(desc||'').replace(/\s+/g,' ').replace(/^\s+|\s+$/g,''), w=s.split(' '), i, pick=-1;
   if(w.length<2) return {part:'',desc:s};
-  if(poImpIsPartTok(w[0])) pick=0;
+  /* Aircraft Spruce: their own Part# (13-24416, 04-00614-25) wins over a MFR model number like PEN2530 */
+  if(spruce) for(i=0;i<w.length;i++) if(/^\d{2}-\d{4,6}(-[A-Z0-9]+)?$/i.test(w[i])){ pick=i; break; }
+  if(pick<0 && poImpIsPartTok(w[0])) pick=0;
   if(pick<0) for(i=0;i<w.length;i++) if(/^(AN|MS|NAS)\d{2,}[A-Z0-9\-\/]*$/i.test(w[i])){ pick=i; break; }
   if(pick<0 && poImpIsPartTok(w[w.length-1]) && /-/.test(w[w.length-1])) pick=w.length-1;
   if(pick<0) return {part:'',desc:s};
@@ -1843,7 +1846,7 @@ function poImpSpruce(rows){
   var IT=/^\s*(\d+)\s+(?:(\d+)\s+)?(.+?)\s+(\d{1,2})%\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s*$/;
   for(i=0;i<rows.length;i++){
     m=rows[i].text.replace(/\s+/g,' ').replace(/^\s+|\s+$/g,'').match(IT);
-    if(m){ var sp=poImpSplitPart(m[3]);
+    if(m){ var sp=poImpSplitPart(m[3],true);
       o.items.push({qty:parseInt(m[1],10),part:sp.part,desc:sp.desc,
                     discountPct:parseInt(m[4],10),price:poImpNum(m[5]),amount:poImpNum(m[6])}); }
   }
