@@ -827,4 +827,5 @@ input.gl-cb{width:15px;height:15px;margin:0;accent-color:var(--navy);cursor:poin
 .gl-bk-l{color:#dbe5f0} .gl-bk-prog{color:#dbe5f0;font-size:12px}
 .gl-bk-clear{margin-left:auto;color:#dbe5f0;font-size:12px}
 .gl-bulk-msg .btn{margin-left:auto}
+.gl-bk-note{flex-basis:100%;font-size:12px}
 @media print{ .gl-ck,#gl-bulk{display:none !important} }

@@ -919,7 +919,8 @@ function glBulkHtml(){
     +'<span class="gl-bk-l">Set status to</span><select id="gl-bk-st">'+glOpts(['Reconciled','Cleared','Pending','Void',''],'Reconciled')+'</select>'
     +'<button class="btn sm gold" id="gl-bk-go"'+(GL_BULK_BUSY?' disabled':'')+'>Apply</button>'
     +'<span class="gl-bk-prog" id="gl-bk-prog"></span>'
-    +'<a href="#" class="gl-bk-clear" id="gl-bk-clear">Clear selection</a></div>';
+    +'<a href="#" class="gl-bk-clear" id="gl-bk-clear">Clear selection</a>'
+    +(GL_BULK_MSG?'<div class="gl-bk-note">'+GL_BULK_MSG+'</div>':'')+'</div>';
 }
 function glPaintBulk(){
   var el=document.getElementById('gl-bulk'); if(!el) return;
@@ -994,7 +995,7 @@ function glBody(){
     if(grouped){ var lab=glGroupLabel(key,top);
       if(lab!==curG){ curG=lab; zi=0; var S=stats[lab];
         rh+='<tr class="gl-grp"><td colspan="'+(di+1)+'">'+esc(lab)+'<span class="gl-gn">'+S.n+' line'+(S.n===1?'':'s')+'</span></td>'
-          +'<td class="num">'+(S.dr?money(S.dr):'')+'</td><td class="num">'+(S.cr?money(S.cr):'')+'</td><td colspan="'+(nc-di-2)+'"></td></tr>'; } }
+          +'<td class="num">'+(S.dr?money(S.dr):'')+'</td><td class="num">'+(S.cr?money(S.cr):'')+'</td><td colspan="'+(nc-di-3)+'"></td></tr>'; } }
     var z2=(zi++%2)?' gl-z':'';
     var cat=null; for(var k2=0;k2<B.length;k2++) if(B[k2].lineType==='Category'){ cat=B[k2]; break; }
     for(var j=0;j<B.length;j++){ var x2=B[j], first=j===0;
