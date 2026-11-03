@@ -1787,6 +1787,32 @@ function poImpNext(rows,i){ for(var n=i+1;n<rows.length;n++) if(rows[n].text.rep
 function poImpKey(s){ return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
 
 /* ---- Aircraft Spruce ---- */
+/* Pull the item / part number out of an invoice description.
+   1) First word, when it looks like a part number (Aircraft Spruce prints the item # first).
+   2) Otherwise a standard AN / MS / NAS number anywhere in the line.
+   3) Otherwise the last word that looks like a part number (e.g. CLEVELAND BLEEDER SCREW 079-00300). */
+function poImpIsPartTok(w){
+  w=w.replace(/[,;:]+$/,'');
+  if(w.length<4 || w.length>24) return false;
+  if(!/\d/.test(w)) return false;
+  if(/^\(|\)$/.test(w)) return false;
+  if(/^[\d,]*\.\d+$/.test(w)) return false;                       /* 25.55 */
+  if(/^\d+(\/\d+)?$/.test(w) && w.length<5) return false;          /* 1/4, 100 */
+  if(/^\d+(\.\d+)?(MM|CM|IN|FT|OZ|LB|LBS|QT|GAL|PK|PC|PCS|V|W|A|AMP|PSI|DEG|%)$/i.test(w)) return false; /* 18MM, 4.7OZ */
+  if(/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(w)) return false;        /* dates */
+  return /^[A-Z0-9][A-Z0-9\-\/\.]*[A-Z0-9]$/i.test(w);
+}
+function poImpSplitPart(desc){
+  var s=String(desc||'').replace(/\s+/g,' ').replace(/^\s+|\s+$/g,''), w=s.split(' '), i, pick=-1;
+  if(w.length<2) return {part:'',desc:s};
+  if(poImpIsPartTok(w[0])) pick=0;
+  if(pick<0) for(i=0;i<w.length;i++) if(/^(AN|MS|NAS)\d{2,}[A-Z0-9\-\/]*$/i.test(w[i])){ pick=i; break; }
+  if(pick<0 && poImpIsPartTok(w[w.length-1]) && /-/.test(w[w.length-1])) pick=w.length-1;
+  if(pick<0) return {part:'',desc:s};
+  var part=w[pick].replace(/[,;:]+$/,''); w.splice(pick,1);
+  return {part:part, desc:w.join(' ')};
+}
+
 function poImpSpruce(rows){
   var o={vendor:'Aircraft Spruce',orderNo:'',invoiceNo:'',custPO:'',invoiceDate:'',shipVia:'',terms:'',
          items:[],subtotal:0,tax:0,misc:0,shipping:0,paidWithOrder:0,balanceDue:0,warnings:[]};
@@ -1817,8 +1843,9 @@ function poImpSpruce(rows){
   var IT=/^\s*(\d+)\s+(?:(\d+)\s+)?(.+?)\s+(\d{1,2})%\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s*$/;
   for(i=0;i<rows.length;i++){
     m=rows[i].text.replace(/\s+/g,' ').replace(/^\s+|\s+$/g,'').match(IT);
-    if(m) o.items.push({qty:parseInt(m[1],10),part:'',desc:m[3].replace(/^\s+|\s+$/g,''),
-                        discountPct:parseInt(m[4],10),price:poImpNum(m[5]),amount:poImpNum(m[6])});
+    if(m){ var sp=poImpSplitPart(m[3]);
+      o.items.push({qty:parseInt(m[1],10),part:sp.part,desc:sp.desc,
+                    discountPct:parseInt(m[4],10),price:poImpNum(m[5]),amount:poImpNum(m[6])}); }
   }
   if(!o.items.length) o.warnings.push('No line items could be read.');
 
@@ -1993,7 +2020,7 @@ function poImpGeneric(rows){
     }
     return (best&&bd<140)?best.role:'desc';
   }
-  var hasQtyCol=false; for(i=0;i<cols.length;i++) if(cols[i].role==='qty') hasQtyCol=true;
+  var hasQtyCol=false, hasPartCol=false; for(i=0;i<cols.length;i++){ if(cols[i].role==='qty') hasQtyCol=true; if(cols[i].role==='part') hasPartCol=true; }
   var last=null;
   for(i=H+1;i<T;i++){
     r=rows[i]; t=r.text.replace(/^\s+|\s+$/g,'');
@@ -2015,6 +2042,7 @@ function poImpGeneric(rows){
     }
     it.desc=descParts.join(' ').replace(/\s+/g,' ');
     if(it.qty==='' && !hasQtyCol){ m=it.desc.match(/^(\d+)\s+(.+)$/); if(m){ it.qty=parseInt(m[1],10); it.desc=m[2]; } }
+    if(!it.part && !hasPartCol && it.desc){ var gp=poImpSplitPart(it.desc); if(gp.part){ it.part=gp.part; it.desc=gp.desc; } }
     if(it.amount==null && it.price!=='' && it.qty!=='') it.amount=Math.round(it.qty*it.price*100)/100;
     if(it.amount!=null && (it.desc||it.part)){
       if(it.price==='' && it.qty>0) it.price=Math.round(it.amount/it.qty*1000)/1000;
