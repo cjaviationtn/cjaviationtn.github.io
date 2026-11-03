@@ -57,7 +57,7 @@ function updateBar(){
   var bk=document.getElementById('pwa-back'); if(bk) bk.disabled=!VIEW_HIST.length;
 }
 function boot(){
-  $('#root').innerHTML='<div class="loading"><div><div class="spin"></div>'+(isCrew()?'Loading…':'Loading your books…')+'</div></div>';
+  $('#root').innerHTML='<div class="loading"><div><div class="spin"></div>'+(isCrew()?'Loading…':'Loading codger headquarters…')+'</div></div>';
   NAV = isCrew() ? NAV_CREW : NAV_ADMIN;
   var run=google.script.run
     .withSuccessHandler(function(d){ DATA=d; buildShell(); render(viewFromHash()); })
