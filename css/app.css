@@ -817,3 +817,14 @@
 select.stat-sel.gl-pill{border:1px solid transparent;padding:3px 8px;cursor:pointer;font-family:inherit;width:auto}
 select.stat-sel.st-none{border-color:var(--line);background:#fff}
 @media print{ .gl-src,.gl-pill,.gl-warn,.ledger-box tr.gl-grp td,.ledger-box tr.gl-z td{-webkit-print-color-adjust:exact;print-color-adjust:exact} .gl-note{max-width:none;white-space:normal} }
+
+/* General Ledger: select several transactions, set status (site 1.6.20) */
+.ledger-box .gl-ck{width:34px;text-align:center;padding-left:6px;padding-right:2px}
+input.gl-cb{width:15px;height:15px;margin:0;accent-color:var(--navy);cursor:pointer;vertical-align:middle}
+.ledger-box tr.gl-on td{background:#e9f0f7 !important}
+.gl-bulk{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--navy);color:#fff;border-radius:10px;padding:9px 14px;margin:0 0 10px;font-size:13px;position:sticky;top:0;z-index:6}
+.gl-bulk select{padding:5px 8px;font-size:12px;border-radius:6px;border:1px solid var(--line);font-family:inherit;width:auto}
+.gl-bk-l{color:#dbe5f0} .gl-bk-prog{color:#dbe5f0;font-size:12px}
+.gl-bk-clear{margin-left:auto;color:#dbe5f0;font-size:12px}
+.gl-bulk-msg .btn{margin-left:auto}
+@media print{ .gl-ck,#gl-bulk{display:none !important} }

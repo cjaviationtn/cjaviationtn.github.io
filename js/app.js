@@ -867,7 +867,7 @@ function ledgerRows(){
   return rows;
 }
 function glHeadRow(){
-  var h='<tr>', cols=glCols();
+  var h='<tr><th class="gl-ck"><input type="checkbox" class="gl-cb" id="gl-ckall" title="Select every transaction showing"></th>', cols=glCols();
   for(var i=0;i<cols.length;i++){ var d=cols[i]; var sorted=GL_SORT.key===d.key; var filt=!!GL_FILTERS[d.key];
     var arrow=sorted?(GL_SORT.dir>0?' ▲':' ▼'):'';
     h+='<th class="'+(d.num?'num ':'')+(filt?'filtered ':'')+'">'+esc(d.label)+arrow+'<button class="fbtn'+((sorted||filt)?' active':'')+'" data-key="'+d.key+'">▾</button></th>';
@@ -899,8 +899,85 @@ function glSrcChip(s){
 }
 function glWarn(r){ var ec=String(r.entryCheck==null?'':r.entryCheck).trim(); if(!ec || /^(✓|✔|ok\b)/i.test(ec)) return ''; return ' <span class="gl-warn" title="Entry Check">⚠ '+esc(ec)+'</span>'; }
 function glNote(v){ v=String(v==null?'':v); return v?'<div class="gl-note" title="'+esc(v)+'">'+esc(v)+'</div>':''; }
+/* ---- Select several transactions and set their status at once (site 1.6.20) ----
+   Front end only: reuses setLedgerStatus (one call per transaction, 4 at a time). */
+var GL_SEL={}, GL_BULK_BUSY=false, GL_BULK_MSG='';
+function glKey(r){ var t=glTxn(r); return t?'t:'+t:'r:'+r.rowNum; }
+function glKeyRow(k){
+  if(k.indexOf('r:')===0) return parseInt(k.slice(2),10);
+  var t=k.slice(2), first=null;
+  for(var i=0;i<LEDGER_CACHE.length;i++){ var r=LEDGER_CACHE[i]; if(glTxn(r)!==t) continue; if(r.lineType==='Category') return r.rowNum; if(first===null) first=r.rowNum; }
+  return first;
+}
+function glSelCount(){ return Object.keys(GL_SEL).length; }
+function glPruneSel(rows){ if(GL_BULK_BUSY) return; var vis={}; for(var i=0;i<rows.length;i++) vis[glKey(rows[i])]=1; for(var k in GL_SEL) if(!vis[k]) delete GL_SEL[k]; }
+function glBulkHtml(){
+  var n=glSelCount();
+  if(!n && !GL_BULK_MSG) return '';
+  if(!n) return '<div class="gl-bulk gl-bulk-msg">'+GL_BULK_MSG+' <button class="btn sm ghost" id="gl-bk-dismiss">OK</button></div>';
+  return '<div class="gl-bulk"><b>'+n+' transaction'+(n===1?'':'s')+' selected</b>'
+    +'<span class="gl-bk-l">Set status to</span><select id="gl-bk-st">'+glOpts(['Reconciled','Cleared','Pending','Void',''],'Reconciled')+'</select>'
+    +'<button class="btn sm gold" id="gl-bk-go"'+(GL_BULK_BUSY?' disabled':'')+'>Apply</button>'
+    +'<span class="gl-bk-prog" id="gl-bk-prog"></span>'
+    +'<a href="#" class="gl-bk-clear" id="gl-bk-clear">Clear selection</a></div>';
+}
+function glPaintBulk(){
+  var el=document.getElementById('gl-bulk'); if(!el) return;
+  el.innerHTML=glBulkHtml();
+  var go=document.getElementById('gl-bk-go'); if(go) go.onclick=function(){ glBulkApply(document.getElementById('gl-bk-st').value); };
+  var cl=document.getElementById('gl-bk-clear'); if(cl) cl.onclick=function(e){ e.preventDefault(); if(GL_BULK_BUSY) return; GL_SEL={}; GL_BULK_MSG=''; repaintLedger(); };
+  var dm=document.getElementById('gl-bk-dismiss'); if(dm) dm.onclick=function(){ GL_BULK_MSG=''; glPaintBulk(); };
+  var all=document.getElementById('gl-ckall');
+  if(all){ var boxes=document.querySelectorAll('#gl-body .gl-rowck'), on=0; for(var i=0;i<boxes.length;i++) if(boxes[i].checked) on++;
+    all.checked=boxes.length>0 && on===boxes.length; all.indeterminate=on>0 && on<boxes.length; }
+}
+function glSetKey(k,on){
+  if(on) GL_SEL[k]=1; else delete GL_SEL[k];
+  var trs=document.querySelectorAll('#gl-body tr[data-k]');
+  for(var i=0;i<trs.length;i++) if(trs[i].getAttribute('data-k')===k){ trs[i].classList.toggle('gl-on',on); var cb=trs[i].querySelector('.gl-rowck'); if(cb) cb.checked=on; }
+}
+function wireBulk(){
+  var cbs=document.querySelectorAll('#gl-body .gl-rowck');
+  for(var i=0;i<cbs.length;i++) cbs[i].onchange=function(){ if(GL_BULK_BUSY){ this.checked=!this.checked; return; } GL_BULK_MSG=''; glSetKey(this.getAttribute('data-k'),this.checked); glPaintBulk(); };
+  var all=document.getElementById('gl-ckall');
+  if(all) all.onchange=function(){ if(GL_BULK_BUSY){ this.checked=!this.checked; return; } GL_BULK_MSG=''; var on=this.checked, rows=ledgerRows(); for(var j=0;j<rows.length;j++) glSetKey(glKey(rows[j]),on); glPaintBulk(); };
+  glPaintBulk();
+}
+function glBulkApply(status){
+  if(GL_BULK_BUSY) return;
+  var keys=Object.keys(GL_SEL); if(!keys.length) return;
+  var label=status||'blank';
+  if(keys.length>25 && !confirm('Set '+keys.length+' transactions to '+label+'?')) return;
+  GL_BULK_BUSY=true;
+  var go=document.getElementById('gl-bk-go'); if(go) go.disabled=true;
+  var queue=keys.slice(), done=0, ok=0, failed=[], running=0, total=keys.length;
+  function prog(){ var p=document.getElementById('gl-bk-prog'); if(p) p.textContent='Saving '+done+' of '+total+'…'; }
+  function finish(){
+    GL_BULK_BUSY=false; GL_SEL={};
+    for(var f=0;f<failed.length;f++) GL_SEL[failed[f].k]=1;   /* failed ones stay checked so Apply can be tried again */
+    GL_BULK_MSG=failed.length
+      ? '<span style="color:#ffd7cf">'+ok+' set to '+esc(label)+'; '+failed.length+' could not be saved and are still checked: '+esc(failed.map(function(x){return x.msg;}).slice(0,3).join(' | '))+'</span>'
+      : '✓ '+ok+' transaction'+(ok===1?'':'s')+' set to '+esc(label)+'.';
+    repaintLedger();
+  }
+  function next(){
+    if(!queue.length){ if(!running) finish(); return; }
+    var k=queue.shift(), rn=glKeyRow(k); running++;
+    if(rn==null){ running--; done++; failed.push({k:k,msg:'row not found'}); prog(); next(); return; }
+    google.script.run
+      .withSuccessHandler(function(res){
+        var rows=(res&&res.rows)||[rn], st=(res&&res.status!=null)?res.status:status;
+        for(var i=0;i<LEDGER_CACHE.length;i++) if(rows.indexOf(LEDGER_CACHE[i].rowNum)>=0) LEDGER_CACHE[i].status=st;
+        running--; done++; ok++; prog(); next();
+      })
+      .withFailureHandler(function(e){ running--; done++; failed.push({k:k,msg:(e&&e.message)||String(e)}); prog(); next(); })
+      .setLedgerStatus(rn, status);
+  }
+  prog(); for(var c=0;c<4;c++) next();
+}
 function glBody(){
-  var rows=ledgerRows(), cols=glCols(), nc=cols.length+1;
+  var rows=ledgerRows(), cols=glCols(), nc=cols.length+2;
+  glPruneSel(rows);
   if(!rows.length) return '<tr><td colspan="'+nc+'" style="text-align:center;padding:20px;color:var(--muted)">No rows match the current filters. <a href="#" id="gl-clearall">Clear all filters</a></td></tr>';
   var key=GL_SORT.key, byDate=key==='date', grouped=!!GL_GROUPED[key];
   /* transaction blocks: only when sorted by date (ties keep sheet order, so a transaction's lines are adjacent) */
@@ -916,13 +993,15 @@ function glBody(){
   for(var bi=0;bi<blocks.length;bi++){ var B=blocks[bi].rows, top=B[0];
     if(grouped){ var lab=glGroupLabel(key,top);
       if(lab!==curG){ curG=lab; zi=0; var S=stats[lab];
-        rh+='<tr class="gl-grp"><td colspan="'+di+'">'+esc(lab)+'<span class="gl-gn">'+S.n+' line'+(S.n===1?'':'s')+'</span></td>'
+        rh+='<tr class="gl-grp"><td colspan="'+(di+1)+'">'+esc(lab)+'<span class="gl-gn">'+S.n+' line'+(S.n===1?'':'s')+'</span></td>'
           +'<td class="num">'+(S.dr?money(S.dr):'')+'</td><td class="num">'+(S.cr?money(S.cr):'')+'</td><td colspan="'+(nc-di-2)+'"></td></tr>'; } }
     var z2=(zi++%2)?' gl-z':'';
     var cat=null; for(var k2=0;k2<B.length;k2++) if(B[k2].lineType==='Category'){ cat=B[k2]; break; }
     for(var j=0;j<B.length;j++){ var x2=B[j], first=j===0;
       if(GL_EDIT_ROW===x2.rowNum){ rh+=glEditRow(x2); continue; }
-      rh+='<tr class="gl-r'+z2+(first?'':' gl-sub')+(isReview(x2)?' rev-row':'')+'">';
+      var gk=glKey(x2), on=!!GL_SEL[gk];
+      rh+='<tr class="gl-r'+z2+(first?'':' gl-sub')+(isReview(x2)?' rev-row':'')+(on?' gl-on':'')+'" data-k="'+esc(gk)+'">';
+      rh+='<td class="gl-ck">'+(first?'<input type="checkbox" class="gl-cb gl-rowck" data-k="'+esc(gk)+'"'+(on?' checked':'')+'>':'')+'</td>';
       for(var c=0;c<cols.length;c++){ var k=cols[c].key, v='';
         if(k==='source') v=first?glSrcChip(x2.source):'';
         else if(k==='date') v=first?glShortDate(x2.date,byDate):'';
@@ -1012,7 +1091,7 @@ function bannerHtml(){
 function vLedger(){
   var top=topbar('General Ledger', LEDGER_CACHE ? (LEDGER_CACHE.length+' lines · click ▾ on any column to sort &amp; filter'+(Object.keys(GL_FILTERS).length?(' · '+Object.keys(GL_FILTERS).length+' filter'+(Object.keys(GL_FILTERS).length>1?'s':'')+' active'):'')) : 'Loading…')+actionsBar();
   if(!LEDGER_CACHE) return top+'<div id="gl-banner"></div><div class="card"><div class="miniload"><div class="spin"></div>Loading the full ledger…</div></div>';
-  return top+'<div id="gl-banner">'+bannerHtml()+'</div>'
+  return top+'<div id="gl-banner">'+bannerHtml()+'</div><div id="gl-bulk"></div>'
     +'<div class="ledger-box"><table class="tb" style="font-size:12px"><thead id="gl-head">'+glHeadRow()+'</thead><tbody id="gl-body">'+glBody()+'</tbody></table></div>';
 }
 /* Repaint the ledger in place and put the scroll back where it was, so saving a
@@ -1044,6 +1123,7 @@ function wireLedger(){
   for(var e1=0;e1<eds.length;e1++) eds[e1].onclick=function(){ GL_EDIT_ROW=parseInt(this.getAttribute('data-gledit'),10); repaintLedger(); };
   var dls=document.querySelectorAll('[data-gldel]');
   for(var d1=0;d1<dls.length;d1++) dls[d1].onclick=function(){ glDelete(parseInt(this.getAttribute('data-gldel'),10)); };
+  wireBulk();
   var glc=document.querySelector('[data-glcancel]'); if(glc) glc.onclick=function(){ GL_EDIT_ROW=null; repaintLedger(); };
   var gls=document.querySelector('[data-glsave]'); if(gls) gls.onclick=function(){ glSave(parseInt(this.getAttribute('data-glsave'),10), this); };
 }
