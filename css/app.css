@@ -808,7 +808,7 @@
 .gl-arrow{color:var(--muted);padding-left:14px}
 .gl-src{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;letter-spacing:.02em;white-space:nowrap}
 .s-v{background:#E1F5EE;color:#085041} .s-a{background:#E6F1FB;color:#0C447C} .s-b{background:#EAF3DE;color:#27500A}
-.s-j{background:#FAEEDA;color:#633806} .s-o{background:#F1EFE8;color:#444441} .s-x{background:var(--cream-d);color:var(--navy-d)}
+.s-j{background:#FAEEDA;color:#633806} .s-o{background:#F1EFE8;color:#444441} .s-t{background:#EEEDFE;color:#3C3489} .s-x{background:var(--cream-d);color:var(--navy-d)}
 .gl-note{max-width:170px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
 .gl-warn{display:inline-block;margin-left:4px;font-size:10.5px;font-weight:700;color:var(--bad);background:#fbeeeb;border-radius:999px;padding:1px 7px;white-space:nowrap}
 .gl-pill{display:inline-block;font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;white-space:nowrap}

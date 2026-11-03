@@ -894,7 +894,7 @@ function glShortDate(s,noYear){
 }
 function glSrcChip(s){
   s=String(s==null?'':s); var u=s.toUpperCase(); if(!u.trim()) return '';
-  var c=/VENMO/.test(u)?'v':/AMEX|AMERICAN EXPRESS/.test(u)?'a':/OPENING|HIST/.test(u)?'o':/^ADJ|JOURNAL/.test(u)?'j':/BANK|CHECK|DEPOSIT/.test(u)?'b':'x';
+  var c=/VENMO/.test(u)?'v':/AMEX|AMERICAN EXPRESS/.test(u)?'a':/OPENING|HIST/.test(u)?'o':/^ADJ|JOURNAL/.test(u)?'j':/BANK|CHECK|DEPOSIT|CKG|SAVINGS/.test(u)?'b':/^TBX/.test(u)?'t':'x';
   return '<span class="gl-src s-'+c+'">'+esc(s)+'</span>';
 }
 function glWarn(r){ var ec=String(r.entryCheck==null?'':r.entryCheck).trim(); if(!ec || /^(✓|✔|ok\b)/i.test(ec)) return ''; return ' <span class="gl-warn" title="Entry Check">⚠ '+esc(ec)+'</span>'; }
