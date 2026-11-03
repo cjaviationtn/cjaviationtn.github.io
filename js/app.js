@@ -804,6 +804,10 @@ var GL_DEF=[
   {key:'status',label:'Status'}
 ];
 var GL_FILTERS={}, GL_SORT={key:'date',dir:-1};
+/* site 1.6.18 restyle: Line Type and Entry Check are no longer shown as columns
+   (the paired "↳" line shows the type; Entry Check shows only when there's a problem). */
+var GL_HIDE={lineType:1,entryCheck:1};
+function glCols(){ var a=[]; for(var i=0;i<GL_DEF.length;i++) if(!GL_HIDE[GL_DEF[i].key]) a.push(GL_DEF[i]); return a; }
 /* The ledger always opens sorted by date (newest first), no matter how it was last sorted
    or where a late-added row sits in the sheet. Column sorts still work within a visit. */
 function glDefaultSort(){ GL_SORT={key:'date',dir:-1}; }
@@ -834,9 +838,11 @@ function accountCell(r){
   return '<select class="acct-sel'+(rev?' rev-sel':'')+'" data-row="'+r.rowNum+'">'+opts+'</select>';
 }
 function reviewCount(){ var c=0; for(var i=0;i<LEDGER_CACHE.length;i++) if(isReview(LEDGER_CACHE[i])) c++; return c; }
+function glStCls(v){ v=String(v==null?'':v).trim().toLowerCase(); return ({pending:'st-pending',cleared:'st-cleared',reconciled:'st-reconciled','void':'st-void'})[v]||'st-none'; }
 function statusCell(r){
-  if(r.lineType!=='Category') return esc(r.status==null?'':r.status);
-  return '<select class="stat-sel" data-row="'+r.rowNum+'" style="width:110px;padding:4px 6px;font-size:12px" title="Status applies to every row of this transaction">'+glOptsWith(GL_STATUSES,String(r.status==null?'':r.status))+'</select>';
+  var v=String(r.status==null?'':r.status);
+  if(r.lineType!=='Category') return v?'<span class="gl-pill '+glStCls(v)+'">'+esc(v)+'</span>':'';
+  return '<select class="stat-sel gl-pill '+glStCls(v)+'" data-row="'+r.rowNum+'" title="Status applies to every row of this transaction">'+glOptsWith(GL_STATUSES,v)+'</select>';
 }
 function cellHtml(r,k){ var d=glDef(k);
   if(k==='account') return accountCell(r);
@@ -861,22 +867,75 @@ function ledgerRows(){
   return rows;
 }
 function glHeadRow(){
-  var h='<tr>';
-  for(var i=0;i<GL_DEF.length;i++){ var d=GL_DEF[i]; var sorted=GL_SORT.key===d.key; var filt=!!GL_FILTERS[d.key];
+  var h='<tr>', cols=glCols();
+  for(var i=0;i<cols.length;i++){ var d=cols[i]; var sorted=GL_SORT.key===d.key; var filt=!!GL_FILTERS[d.key];
     var arrow=sorted?(GL_SORT.dir>0?' ▲':' ▼'):'';
-    h+='<th class="'+(d.num?'num ':'')+(filt?'filtered ':'')+(d.key==='entryCheck'?'gl-noprint':'')+'">'+esc(d.label)+arrow+'<button class="fbtn'+((sorted||filt)?' active':'')+'" data-key="'+d.key+'">▾</button></th>';
+    h+='<th class="'+(d.num?'num ':'')+(filt?'filtered ':'')+'">'+esc(d.label)+arrow+'<button class="fbtn'+((sorted||filt)?' active':'')+'" data-key="'+d.key+'">▾</button></th>';
   }
   return h+'<th class="gl-act" style="width:104px">Actions</th></tr>';
 }
+/* ---- General Ledger look (site 1.6.18) ----
+   Sorted by date: the lines of one transaction sit together (cash line on top, "↳" lines under it),
+   with a header per month. Sorted by Source / Account / Status: a header per group.
+   Every group header shows its line count and debit / credit totals for the rows showing. */
+var GL_MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var GL_MONTH=['January','February','March','April','May','June','July','August','September','October','November','December'];
+var GL_GROUPED={date:1,source:1,account:1,status:1};
+function glTxn(r){ return String(r.txnId==null?'':r.txnId).trim(); }
+function glGroupLabel(k,r){
+  if(k==='date'){ var iso=glDateISO(r.date); return iso?GL_MONTH[parseInt(iso.slice(5,7),10)-1]+' '+iso.slice(0,4):'(No date)'; }
+  var v=cellStr(r,k); return v===''?'(Blank)':v;
+}
+function glShortDate(s,noYear){
+  var iso=glDateISO(s); if(!iso) return esc(s);
+  var y=parseInt(iso.slice(0,4),10), out=GL_MON[parseInt(iso.slice(5,7),10)-1]+' '+parseInt(iso.slice(8,10),10);
+  if(!noYear && y!==new Date().getFullYear()) out+=', '+y;
+  return '<span style="white-space:nowrap" title="'+esc(s)+'">'+out+'</span>';
+}
+function glSrcChip(s){
+  s=String(s==null?'':s); var u=s.toUpperCase(); if(!u.trim()) return '';
+  var c=/VENMO/.test(u)?'v':/AMEX|AMERICAN EXPRESS/.test(u)?'a':/OPENING|HIST/.test(u)?'o':/^ADJ|JOURNAL/.test(u)?'j':/BANK|CHECK|DEPOSIT/.test(u)?'b':'x';
+  return '<span class="gl-src s-'+c+'">'+esc(s)+'</span>';
+}
+function glWarn(r){ var ec=String(r.entryCheck==null?'':r.entryCheck).trim(); if(!ec || /^(✓|✔|ok\b)/i.test(ec)) return ''; return ' <span class="gl-warn" title="Entry Check">⚠ '+esc(ec)+'</span>'; }
+function glNote(v){ v=String(v==null?'':v); return v?'<div class="gl-note" title="'+esc(v)+'">'+esc(v)+'</div>':''; }
 function glBody(){
-  var rows=ledgerRows(); if(!rows.length) return '<tr><td colspan="12" style="text-align:center;padding:20px;color:var(--muted)">No rows match the current filters. <a href="#" id="gl-clearall">Clear all filters</a></td></tr>';
-  var rh='';
-  for(var r=0;r<rows.length;r++){ var x=rows[r];
-    if(GL_EDIT_ROW===x.rowNum){ rh+=glEditRow(x); continue; }
-    rh+='<tr'+(isReview(x)?' class="rev-row"':'')+'>';
-    for(var c=0;c<GL_DEF.length;c++){ var k=GL_DEF[c].key; rh+='<td'+(GL_DEF[c].num?' class="num"':(k==='entryCheck'?' class="gl-noprint"':''))+'>'+cellHtml(x,k)+'</td>'; }
-    rh+='<td class="gl-act" style="white-space:nowrap"><button class="btn ghost" style="padding:3px 8px;font-size:11px" data-gledit="'+x.rowNum+'">Edit</button> <button class="btn ghost" style="padding:3px 8px;font-size:11px" data-gldel="'+x.rowNum+'" title="Delete this transaction">\u2715</button></td>';
-    rh+='</tr>';
+  var rows=ledgerRows(), cols=glCols(), nc=cols.length+1;
+  if(!rows.length) return '<tr><td colspan="'+nc+'" style="text-align:center;padding:20px;color:var(--muted)">No rows match the current filters. <a href="#" id="gl-clearall">Clear all filters</a></td></tr>';
+  var key=GL_SORT.key, byDate=key==='date', grouped=!!GL_GROUPED[key];
+  /* transaction blocks: only when sorted by date (ties keep sheet order, so a transaction's lines are adjacent) */
+  var blocks=[];
+  for(var i=0;i<rows.length;i++){ var x=rows[i], t=glTxn(x), last=blocks[blocks.length-1];
+    if(byDate && t && last && last.t===t) last.rows.push(x); else blocks.push({t:t,rows:[x]}); }
+  for(var q=0;q<blocks.length;q++){ var br=blocks[q].rows; if(br.length>1){ var fin=[],oth=[]; for(var z=0;z<br.length;z++) (br[z].lineType==='Financial'?fin:oth).push(br[z]); blocks[q].rows=fin.concat(oth); } }
+  /* group stats */
+  var stats={};
+  if(grouped) for(var g=0;g<rows.length;g++){ var lb=glGroupLabel(key,rows[g]), st=stats[lb]||(stats[lb]={n:0,dr:0,cr:0}); st.n++; st.dr+=Number(rows[g].debit)||0; st.cr+=Number(rows[g].credit)||0; }
+  var di=0; for(var c0=0;c0<cols.length;c0++) if(cols[c0].key==='debit'){ di=c0; break; }
+  var rh='', curG=null, zi=0;
+  for(var bi=0;bi<blocks.length;bi++){ var B=blocks[bi].rows, top=B[0];
+    if(grouped){ var lab=glGroupLabel(key,top);
+      if(lab!==curG){ curG=lab; zi=0; var S=stats[lab];
+        rh+='<tr class="gl-grp"><td colspan="'+di+'">'+esc(lab)+'<span class="gl-gn">'+S.n+' line'+(S.n===1?'':'s')+'</span></td>'
+          +'<td class="num">'+(S.dr?money(S.dr):'')+'</td><td class="num">'+(S.cr?money(S.cr):'')+'</td><td colspan="'+(nc-di-2)+'"></td></tr>'; } }
+    var z2=(zi++%2)?' gl-z':'';
+    var cat=null; for(var k2=0;k2<B.length;k2++) if(B[k2].lineType==='Category'){ cat=B[k2]; break; }
+    for(var j=0;j<B.length;j++){ var x2=B[j], first=j===0;
+      if(GL_EDIT_ROW===x2.rowNum){ rh+=glEditRow(x2); continue; }
+      rh+='<tr class="gl-r'+z2+(first?'':' gl-sub')+(isReview(x2)?' rev-row':'')+'">';
+      for(var c=0;c<cols.length;c++){ var k=cols[c].key, v='';
+        if(k==='source') v=first?glSrcChip(x2.source):'';
+        else if(k==='date') v=first?glShortDate(x2.date,byDate):'';
+        else if(k==='desc') v=(first?esc(x2.desc):'<span class="gl-arrow">↳ '+esc(x2.desc&&x2.desc!==top.desc?x2.desc:String(x2.lineType||'line').toLowerCase())+'</span>')+glWarn(x2);
+        else if(k==='ref') v=(!first&&String(x2.ref)===String(top.ref))?'':esc(x2.ref);
+        else if(k==='notes') v=(!first&&String(x2.notes)===String(top.notes))?'':glNote(x2.notes);
+        else if(k==='status') v=(B.length>1)?(first?statusCell(cat||top):''):statusCell(x2);
+        else v=cellHtml(x2,k);
+        rh+='<td'+(cols[c].num?' class="num"':'')+'>'+v+'</td>';
+      }
+      rh+='<td class="gl-act" style="white-space:nowrap"><button class="btn ghost" style="padding:3px 8px;font-size:11px" data-gledit="'+x2.rowNum+'">Edit</button>'
+        +(first?' <button class="btn ghost" style="padding:3px 8px;font-size:11px" data-gldel="'+x2.rowNum+'" title="Delete this transaction">✕</button>':'')+'</td></tr>';
+    }
   }
   return rh;
 }
