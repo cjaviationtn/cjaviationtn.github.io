@@ -102,7 +102,6 @@ function startApp(){
 
 var NAV_ADMIN=[
   ['dashboard','◧','Dashboard'],
-  ['entry','＋','New Transaction'],
   ['ledger','≣','General Ledger'],
   ['tbx','⧉','TBX'],
   ['coa','☰','Chart of Accounts'],
@@ -181,7 +180,8 @@ function render(v){
   if(mainEl) mainEl.classList.toggle('wide', v==='ledger'||v==='bench');
   $('#content').innerHTML=printHead(VIEW_TITLE[v])+VIEWS[v]();
   var btns=document.querySelectorAll('#nav button');
-  for(var i=0;i<btns.length;i++) btns[i].classList.toggle('active',btns[i].getAttribute('data-view')===v);
+  var navV=(v==='entry')?'ledger':v;   /* New Transaction lives under the General Ledger */
+  for(var i=0;i<btns.length;i++) btns[i].classList.toggle('active',btns[i].getAttribute('data-view')===navV);
   renderMnav(); if(v!=='bench' && v!=='clock') injectPrintControls();  /* nothing to print on Bench Stock (own print) or the Time Clock */
   if(v==='dashboard') loadDash();
   if(v==='pl'||v==='bs'||v==='equity') wireFY();
@@ -211,7 +211,7 @@ function renderMnav(){
   drawerToggle(false);
   var mt=document.getElementById('mbar-title'); if(mt) mt.textContent=VIEW_TITLE[current]||'';
   var html='';
-  for(var i=0;i<NAV.length;i++) html+='<button data-view="'+NAV[i][0]+'" class="'+(NAV[i][0]===current?'active':'')+'">'+NAV[i][2]+'</button>';
+  for(var i=0;i<NAV.length;i++) html+='<button data-view="'+NAV[i][0]+'" class="'+(NAV[i][0]===(current==='entry'?'ledger':current)?'active':'')+'">'+NAV[i][2]+'</button>';
   $('#mnav').innerHTML=html;
   var btns=$('#mnav').querySelectorAll('button');
   for(var j=0;j<btns.length;j++) btns[j].onclick=function(){ render(this.getAttribute('data-view')); };
@@ -435,15 +435,14 @@ function row2(a,b){ return '<tr><td>'+a+'</td><td class="num">'+b+'</td></tr>'; 
 function actionsBar(){
   var A=DATA.dashboardActions||[];
   var h='<div id="act-flash"></div>';
-  if(!A.length) return h;
-  h+='<div class="actions">';
+  h+='<div class="actions"><button class="btn" id="gl-new" onclick="render(\'entry\')">＋ New transaction</button>';
   for(var k=0;k<A.length;k++) h+='<button class="'+A[k].style+'" data-fn="'+esc(A[k].fn)+'" data-confirm="'+(A[k].confirm?'1':'')+'" data-prompt="'+esc(A[k].promptText||'')+'" data-label="'+esc(A[k].label)+'">'+esc(A[k].label)+'</button>';
   return h+'</div>';
 }
 function wireActions(){
   var wrap=document.querySelector('#content .actions'); if(!wrap) return;
   var btns=wrap.querySelectorAll('button');
-  for(var i=0;i<btns.length;i++){ btns[i].onclick=function(){
+  for(var i=0;i<btns.length;i++){ if(!btns[i].getAttribute('data-fn')) continue; btns[i].onclick=function(){
     var fn=this.getAttribute('data-fn'), label=this.getAttribute('data-label'),
         needsConfirm=this.getAttribute('data-confirm')==='1', promptText=this.getAttribute('data-prompt')||'';
     var arg=null;
@@ -1323,7 +1322,8 @@ function allEntryOptions(){
 function selCode(sel){ var o=sel.options[sel.selectedIndex]; return o?(o.getAttribute('data-code')||''):''; }
 function vEntry(){
   var today=new Date().toISOString().slice(0,10);
-  return topbar('New Transaction','Type once — it posts the balanced double-entry pair to your ledger')
+  return '<div class="gl-back"><button class="btn sm ghost" onclick="render(\'ledger\')">← General Ledger</button></div>'
+  +topbar('New Transaction','Type once — it posts the balanced double-entry pair to your ledger')
   +'<div id="flash"></div><div class="grid g2">'
   +'<div class="card pad">'
     +'<div class="form-row"><div><label>Date</label><input type="date" id="f-date" value="'+today+'"></div><div><label>Amount (USD)</label><input type="number" id="f-amt" placeholder="0.00" step="0.01" min="0"></div></div>'
@@ -1378,7 +1378,7 @@ function wireEntry(){
       : { date:date.value, amount:a, desc:desc.value, ref:ref.value, notes:notes.value, direction:t, moneyAccount:{code:selCode(selA),name:selA.value}, categoryAccount:{name:selB.value} };
     google.script.run
       .withSuccessHandler(function(res){ LEDGER_CACHE=null; render('entry');
-        $('#flash').innerHTML='<div class="flash ok">✓ Posted '+esc(res.txnId)+' — balanced pair written to the ledger ('+money(a)+'). Open the General Ledger tab to see it.</div>'; })
+        $('#flash').innerHTML='<div class="flash ok">✓ Posted '+esc(res.txnId)+' — balanced pair written to the ledger ('+money(a)+'). <button class="btn sm" style="margin-left:8px" onclick="render(\'ledger\')">View in General Ledger</button></div>'; })
       .withFailureHandler(function(e){ post.disabled=false; post.textContent='Post to ledger';
         $('#flash').innerHTML='<div class="flash err">Could not post: '+esc(e.message||e)+'</div>'; })
       .postTransaction(payload);

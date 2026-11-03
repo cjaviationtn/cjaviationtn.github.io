@@ -791,3 +791,6 @@
 .po-typebox{width:20px;height:20px;border:2px solid #b8c2cc;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;line-height:1;color:#fff}
 .po-typeopt.on .po-typebox{background:var(--navy);border-color:var(--navy)}
 .po-typeopt:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+
+/* New Transaction: back button to the General Ledger (site 1.6.16) */
+.gl-back{margin:-6px 0 10px}
