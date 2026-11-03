@@ -248,14 +248,13 @@ function printAll(){
 function vDashboard(){
   var F=finBuild();
   return topbar('Dashboard','Shop operations · financial statements · '+fyLabel()+' · pulled live from your General Ledger'+(DATA.ledgerUpdated?'  ·  <span class="lupd">Ledger last updated: '+esc(DATA.ledgerUpdated)+'</span>':''))
-  +'<div class="fin-tools fy-tools">'+fySelectHtml()
-  +'<span class="hint">'+(fySelectHtml()?'Statements below are for the selected year; the balance sheet is as of Dec 31 for past years. ':'')+'Each statement has its own Print button. "Print / PDF this page" prints the summary and all three statements, one per page.</span></div>'
+  +'<div class="fin-tools"><span class="hint">Each statement has its own Print button. "Print / PDF this page" prints the summary and all three statements, one per page.</span></div>'
   +'<div class="fin-page'+(FIN_SHOW_ZERO?' show-zero':'')+'" id="fin-page">'
   +'<div id="fin-ops">'+opsSection()+'</div>'
   +'<div class="section-title" style="margin-top:0">Money at a glance</div>'+F.kpis
   +'<div class="section-title">Financial statements</div>'+F.statements
-  +'<div class="fin-tools fin-foot"><label class="fin-chk"><input type="checkbox" id="fin-zero"'+(FIN_SHOW_ZERO?' checked':'')+'> Show $0 accounts</label>'
-  +'<span class="hint">Hidden rows are accounts with nothing in them for '+FY_YEAR+'.</span></div>'
+  +'<div class="fin-tools fin-foot">'+fySelectHtml()+'<label class="fin-chk"><input type="checkbox" id="fin-zero"'+(FIN_SHOW_ZERO?' checked':'')+'> Show $0 accounts</label>'
+  +'<span class="hint">'+(fySelectHtml()?'Statements above are for the selected year; the balance sheet is as of Dec 31 for past years. ':'')+'Hidden rows are accounts with nothing in them for '+FY_YEAR+'.</span></div>'
   +'</div>';
 }
 /* ---------- SHOP OPERATIONS (dashboard summary of PO / Pay / CTK) ---------- */
@@ -493,10 +492,10 @@ function sheetReport(arr,title,subtitle,amountLabel){
     +'<div class="s-sub">'+esc(subtitle)+'</div>'
     +'<table><thead><tr class="s-head"><th>Account</th><th class="num">'+esc(amountLabel)+'</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
-function vPL(){ return topbar('Income Statement','Profit &amp; Loss · '+fyLabel())+fyToolsHtml()
-  +sheetReport(DATA.incomeStatement,'C&J AVIATION LLC — Income Statement (P&L)','For the Period Ending: '+fyLabel()+' (Jan - Dec) · auto-calculated from the General Ledger','Amount (USD)'); }
-function vBS(){ return topbar('Balance Sheet','Assets = Liabilities + Equity · '+fyLabel())+fyToolsHtml()
-  +sheetReport(DATA.balanceSheet,'C&J AVIATION LLC — Balance Sheet','As of: '+(fyIsCurrent()?'today':'Dec 31, '+FY_YEAR)+' ('+fyLabel()+') · Assets = Liabilities + Equity · Balance Check must equal $0.00','Balance (USD)'); }
+function vPL(){ return topbar('Income Statement','Profit &amp; Loss · '+fyLabel())
+  +sheetReport(DATA.incomeStatement,'C&J AVIATION LLC — Income Statement (P&L)','For the Period Ending: '+fyLabel()+' (Jan - Dec) · auto-calculated from the General Ledger','Amount (USD)')+fyToolsHtml(); }
+function vBS(){ return topbar('Balance Sheet','Assets = Liabilities + Equity · '+fyLabel())
+  +sheetReport(DATA.balanceSheet,'C&J AVIATION LLC — Balance Sheet','As of: '+(fyIsCurrent()?'today':'Dec 31, '+FY_YEAR)+' ('+fyLabel()+') · Assets = Liabilities + Equity · Balance Check must equal $0.00','Balance (USD)')+fyToolsHtml(); }
 
 /* ---------- DASHBOARD FINANCIALS (Income Statement + Balance Sheet + Member Equity) ---------- */
 /* Rendered inside vDashboard. Reads the same DATA.incomeStatement / DATA.balanceSheet /
@@ -520,7 +519,7 @@ function fySelectHtml(){
   for(var i=0;i<ys.length;i++) h+='<option value="'+ys[i]+'"'+(ys[i]===FY_YEAR?' selected':'')+'>'+ys[i]+'</option>';
   return h+'</select></label>'+(FY_BUSY?'<span class="fy-busy"><span class="spin"></span>Loading '+FY_YEAR+'\u2026</span>':'');
 }
-function fyToolsHtml(hint){ var sel=fySelectHtml(); if(!sel) return ''; return '<div class="fin-tools fy-tools">'+sel+(hint?'<span class="hint">'+hint+'</span>':'')+'</div>'; }
+function fyToolsHtml(hint){ var sel=fySelectHtml(); if(!sel) return ''; return '<div class="fin-tools fin-foot">'+sel+(hint?'<span class="hint">'+hint+'</span>':'')+'</div>'; }   /* bottom of the page since site 1.6.14 */
 function wireFY(){ var sel=$('#fy-sel'); if(sel) sel.onchange=function(){ fySet(parseInt(sel.value,10)); }; }
 function fySet(y){ if(!(y>1900)||y===FY_YEAR) return; FY_YEAR=y; FY_BUSY=true; render(current); fyRefresh(); }
 /* Re-pull the statements for FY_YEAR (also used after every ledger edit — see glRefreshReports). */
@@ -720,7 +719,7 @@ function vEquity(){
 
   var head=-1;
   for(var i=0;i<g.length;i++){ if(String(g[i][0]).indexOf('Equity Component')===0){ head=i; break; } }
-  var html=topbar('LLC Member Equity',fyLabel()+' · 50 / 50 ownership · auto-calculated from the ledger')+fyToolsHtml()+'<div class="card"><table class="rpt"><thead><tr>';
+  var html=topbar('LLC Member Equity',fyLabel()+' · 50 / 50 ownership · auto-calculated from the ledger')+'<div class="card"><table class="rpt"><thead><tr>';
   if(head>=0){ for(var c=0;c<4;c++) html+='<th'+(c>0?' class="num"':'')+'>'+esc(String(g[head][c]).replace(/\n/g,' '))+'</th>'; }
   html+='</tr></thead><tbody>';
   for(var r=head+1;r<g.length;r++){
@@ -731,7 +730,7 @@ function vEquity(){
     for(var c2=1;c2<4;c2++){ var v=row[c2]; var neg=(typeof v==='number'&&v<0)?' neg':''; html+='<td class="num'+neg+'">'+(v===''||v==null?'':money(v))+'</td>'; }
     html+='</tr>';
   }
-  html+='</tbody></table></div><div class="hint" style="margin:10px 4px">Net income/loss is allocated 50/50 per the Operating Agreement.</div>';
+  html+='</tbody></table></div><div class="hint" style="margin:10px 4px">Net income/loss is allocated 50/50 per the Operating Agreement.</div>'+fyToolsHtml();
   return html;
 }
 
