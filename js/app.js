@@ -1391,7 +1391,28 @@ function wireEntry(){
 
 var PO_CACHE=null, PO_FILTER='all', PO_EDIT_ROW=null, PO_MSG=null, PO_SHOW_NEW=false, PO_NEW_ITEMS=null;
 var PO_PAGE=0, PO_PAGE_SIZE=25;   // the PO list is paged, 25 per page
-var PO_TYPES=['Consumable','Customer Part','Bench Stock'];
+var PO_TYPES=['Expense','Customer Part'];
+/* older rows were typed Consumable or Bench Stock before the list was cut to two; show them as Expense */
+function poTypeLabel(t){ return (t==='Consumable'||t==='Bench Stock')?'Expense':(t||''); }
+/* Type is picked with two tick boxes that act as one choice. A hidden input keeps the old id,
+   so everything that reads $('#po-type').value / $('#poimp-type').value still works. */
+function poTypePicker(id, current){
+  var cur=poTypeLabel(current)||PO_TYPES[0], h='<input type="hidden" id="'+id+'" value="'+esc(cur)+'">'
+    +'<div class="po-typepick" role="radiogroup" aria-label="PO type">';
+  for(var i=0;i<PO_TYPES.length;i++){ var on=(PO_TYPES[i]===cur);
+    h+='<button type="button" class="po-typeopt'+(on?' on':'')+'" role="radio" aria-checked="'+(on?'true':'false')+'" data-typefor="'+id+'" data-v="'+esc(PO_TYPES[i])+'">'
+      +'<span class="po-typebox">'+(on?'\u2713':'')+'</span>'+esc(PO_TYPES[i])+'</button>'; }
+  return h+'</div>';
+}
+function poWireTypePickers(){
+  var bs=document.querySelectorAll('[data-typefor]');
+  for(var i=0;i<bs.length;i++) bs[i].onclick=function(){
+    var id=this.getAttribute('data-typefor'), v=this.getAttribute('data-v'), sib=document.querySelectorAll('[data-typefor="'+id+'"]');
+    for(var j=0;j<sib.length;j++){ var on=(sib[j]===this); sib[j].className='po-typeopt'+(on?' on':''); sib[j].setAttribute('aria-checked',on?'true':'false'); sib[j].firstChild.innerHTML=on?'\u2713':''; }
+    var inp=document.getElementById(id); if(inp) inp.value=v;
+    if(id==='poimp-type' && PO_IMP) PO_IMP.type=v;
+  };
+}
 var PO_STATUSES=['Open','Partially Received','Received','Closed/Paid','Cancelled'];
 var PO_IMP=null, PO_IMP_BUSY=false, PO_IMP_ERR=null;   /* invoice PDF import */
 
@@ -1448,12 +1469,11 @@ function paintPO(){
     + ' <button class="btn ghost" id="po-copynext" type="button" title="Copy next PO number" data-po="'+esc(d.nextPO)+'" style="padding:2px 8px;font-size:11px;width:auto;margin-left:6px">Copy</button></span></div>';
 
   var today=new Date().toISOString().slice(0,10);
-  var typeOpts=''; for(var i=0;i<PO_TYPES.length;i++) typeOpts+='<option value="'+PO_TYPES[i]+'">'+PO_TYPES[i]+'</option>';
   var newForm = PO_SHOW_NEW ? (
       '<div class="card pad" id="po-newcard" style="margin-bottom:18px">'
       + '<div class="section-title" style="margin-top:0">New PO — '+esc(d.nextPO)+'</div>'
       + '<div class="form-row"><div><label>Vendor</label><input id="po-vendor" placeholder="e.g. Aircraft Spruce"></div>'
-      + '<div><label>Type</label><select id="po-type">'+typeOpts+'</select></div></div>'
+      + '<div><label>Type</label>'+poTypePicker('po-type','Expense')+'</div></div>'
       + '<div class="form-row"><div><label>Work Order / Aircraft (N-Number)</label><input id="po-wo" placeholder="e.g. 1029 / N1234A  (or none)"></div>'
       + '<div><label>Date</label><input id="po-date" type="date" value="'+today+'"></div></div>'
       + '<label>Line items</label><div id="po-items"></div>'
@@ -1494,7 +1514,7 @@ function paintPO(){
         + '<td style="white-space:nowrap">'+esc(poFmtDate(p.date))+'</td>'
         + '<td>'+esc(p.vendor)+'</td>'
         + '<td>'+esc(p.wo)+'</td>'
-        + '<td>'+esc(p.type)+'</td>'
+        + '<td>'+esc(poTypeLabel(p.type))+'</td>'
         + '<td>'+esc(p.desc)+'</td>'
         + '<td style="white-space:nowrap">'+poChip(p.status)+poPaidChip(p)+'</td>'
         + '<td class="num">'+(p.total!=null?money(p.total):'')+'</td>'
@@ -1630,6 +1650,7 @@ function wirePO(){
   if(PO_SHOW_NEW){ poRenderItems(); var ai=$('#po-additem'); if(ai) ai.onclick=function(){ if(!PO_NEW_ITEMS) PO_NEW_ITEMS=[]; PO_NEW_ITEMS.push({qty:'',part:'',desc:'',price:''}); poRenderItems(); }; }
 
   poImpWire();
+  poWireTypePickers();
 
   var pbt=document.querySelectorAll('[data-popaid]');
   for(var pk=0;pk<pbt.length;pk++) pbt[pk].onclick=function(){
@@ -2126,14 +2147,13 @@ function poImpCard(){
     + '</tbody></table></div>';
 
   var typeOpts='',statOpts='';
-  for(i=0;i<PO_TYPES.length;i++) typeOpts+='<option value="'+PO_TYPES[i]+'"'+(PO_TYPES[i]===PO_IMP.type?' selected':'')+'>'+PO_TYPES[i]+'</option>';
   for(i=0;i<PO_STATUSES.length;i++) statOpts+='<option value="'+PO_STATUSES[i]+'"'+(PO_STATUSES[i]===PO_IMP.status?' selected':'')+'>'+poStatusLabel(PO_STATUSES[i])+'</option>';
 
   var form='<div class="card pad" style="margin:0"><div class="section-title" style="margin-top:0">Writes to the PO Log</div>'
     + '<div class="form-row"><div><label>PO number</label><input id="poimp-po" value="'+esc(PO_IMP.po)+'"></div>'
     + '<div><label>Vendor</label><input id="poimp-vendor" value="'+esc(PO_IMP.vendor)+'"></div></div>'
     + '<div class="form-row"><div><label>Work Order / Aircraft (N-Number)</label><input id="poimp-wo" value="'+esc(PO_IMP.wo)+'" placeholder="required"></div>'
-    + '<div><label>Type</label><select id="poimp-type">'+typeOpts+'</select></div></div>'
+    + '<div><label>Type</label>'+poTypePicker('poimp-type',PO_IMP.type)+'</div></div>'
     + '<div class="form-row"><div><label>Status</label><select id="poimp-status">'+statOpts+'</select></div>'
     + '<div><label>Date</label><input id="poimp-date" type="date" value="'+esc(PO_IMP.date)+'"></div></div>'
     + '<div class="form-row"><div><label>Shipping</label><input id="poimp-ship" value="'+esc(PO_IMP.shipping)+'"></div>'
@@ -2221,7 +2241,7 @@ function poImpWire(){
   if(close) close.onclick=function(){ PO_IMP=null; PO_IMP_ERR=null; paintPO(); };
   if(!PO_IMP) return;
 
-  var f=['po','vendor','wo','type','status','date','ship','tax'];
+  var f=['po','vendor','wo','status','date','ship','tax'];
   var pcb=$('#poimp-paid'); if(pcb) pcb.onchange=function(){ PO_IMP.paid=this.checked?(PO_IMP.date||poToday_()):''; };
   for(var k=0;k<f.length;k++){
     (function(name){

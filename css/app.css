@@ -779,3 +779,11 @@
 .clock-tile.owed b{color:#b23b1e}
 .clock-row{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:7px 0;border-top:1px solid var(--line)}
 .clock-row span:last-child{font-weight:600;white-space:nowrap}
+
+/* ---- PO Type: two tick boxes acting as one choice ---- */
+.po-typepick{display:flex;gap:10px}
+.po-typeopt{flex:1;display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:9px;padding:11px 12px;font:inherit;font-size:14px;color:var(--ink);background:#fff;cursor:pointer;text-align:left;width:auto}
+.po-typeopt.on{border-color:var(--navy);background:#eef3f8}
+.po-typebox{width:20px;height:20px;border:2px solid #b8c2cc;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;line-height:1;color:#fff}
+.po-typeopt.on .po-typebox{background:var(--navy);border-color:var(--navy)}
+.po-typeopt:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
