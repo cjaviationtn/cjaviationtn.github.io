@@ -221,14 +221,14 @@ function printHead(title){
   var logo = LOGO_URI ? '<img class="plogo" src="'+LOGO_URI+'">' : '<div class="logo-badge"></div>';
   return '<div class="print-head">'+logo+'<div><div class="co">C&J AVIATION LLC — '+esc(title)+'</div><div class="meta">'+fyLabel()+' · printed '+d+'</div></div></div>';
 }
-function topbar(title,sub,tag){ return '<div class="topbar"><div><h2>'+title+'</h2><div class="sub">'+sub+'</div></div><div><span class="pill">'+(tag||'live · from your sheet')+'</span></div></div>'; }
+function topbar(title,sub,tag){ return '<div class="topbar"><div><h2>'+title+'</h2><div class="sub">'+sub+'</div></div>'+(tag===false?'':'<div><span class="pill">'+(tag||'live · from your sheet')+'</span></div>')+'</div>'; }   /* tag===false: no pill (Dashboard puts it in its bottom bar, site 1.6.15) */
 
 
 function injectPrintControls(){
-  var tb=$('#content .topbar'); if(!tb) return;
+  var slot=$('#content #print-slot'), tb=$('#content .topbar'); if(!slot && !tb) return;
   var wrap=document.createElement('div'); wrap.className='print-controls';
   wrap.innerHTML='<button class="btn sm ghost" id="printOne">🖨 Print / PDF this page</button><button class="btn sm gold" id="printAll">📄 Export all</button>';
-  tb.lastElementChild.appendChild(wrap);
+  (slot||tb.lastElementChild).appendChild(wrap);
   $('#printOne').onclick=function(){ window.print(); };
   $('#printAll').onclick=printAll;
 }
@@ -247,14 +247,14 @@ function printAll(){
 
 function vDashboard(){
   var F=finBuild();
-  return topbar('Dashboard','Shop operations · financial statements · '+fyLabel()+' · pulled live from your General Ledger'+(DATA.ledgerUpdated?'  ·  <span class="lupd">Ledger last updated: '+esc(DATA.ledgerUpdated)+'</span>':''))
-  +'<div class="fin-tools"><span class="hint">Each statement has its own Print button. "Print / PDF this page" prints the summary and all three statements, one per page.</span></div>'
+  return topbar('Dashboard','Shop operations · financial statements · '+fyLabel()+' · pulled live from your General Ledger'+(DATA.ledgerUpdated?'  ·  <span class="lupd">Ledger last updated: '+esc(DATA.ledgerUpdated)+'</span>':''),false)
   +'<div class="fin-page'+(FIN_SHOW_ZERO?' show-zero':'')+'" id="fin-page">'
   +'<div id="fin-ops">'+opsSection()+'</div>'
   +'<div class="section-title" style="margin-top:0">Money at a glance</div>'+F.kpis
   +'<div class="section-title">Financial statements</div>'+F.statements
   +'<div class="fin-tools fin-foot">'+fySelectHtml()+'<label class="fin-chk"><input type="checkbox" id="fin-zero"'+(FIN_SHOW_ZERO?' checked':'')+'> Show $0 accounts</label>'
-  +'<span class="hint">'+(fySelectHtml()?'Statements above are for the selected year; the balance sheet is as of Dec 31 for past years. ':'')+'Hidden rows are accounts with nothing in them for '+FY_YEAR+'.</span></div>'
+  +'<div class="fin-foot-r" id="print-slot"><span class="pill">live · from your sheet</span></div>'
+  +'<span class="hint">'+(fySelectHtml()?'Statements above are for the selected year; the balance sheet is as of Dec 31 for past years. ':'')+'Hidden rows are accounts with nothing in them for '+FY_YEAR+'. Each statement has its own Print button. "Print / PDF this page" prints the summary and all three statements, one per page.</span></div>'
   +'</div>';
 }
 /* ---------- SHOP OPERATIONS (dashboard summary of PO / Pay / CTK) ---------- */
