@@ -595,6 +595,14 @@
   .po-tbl tr.rev-row td[colspan="9"]{flex:0 0 100%;order:11}
   .po-tbl tr.rev-row td[colspan="9"] > div > div{min-width:0 !important;flex:1 1 45%}
   .po-tbl tr.rev-row input,.po-tbl tr.rev-row select{width:100%}
+  /* edit form: no card labels on its cell, nothing wider than the card (iOS date inputs ignore width unless un-styled) */
+  .po-tbl tr.rev-row td[colspan="9"]{min-width:0;width:100%}
+  .po-tbl tr.rev-row td[colspan="9"]::before{content:none;display:none}
+  .po-tbl tr.rev-row input:not([type=checkbox]),.po-tbl tr.rev-row select{box-sizing:border-box;min-width:0;max-width:100%;height:44px;font-size:16px}
+  .po-tbl tr.rev-row input[type=date]{-webkit-appearance:none;appearance:none;display:block;background:#fff;text-align:left}
+  .po-tbl tr.rev-row input[type=date]::-webkit-date-and-time-value{text-align:left}
+  .po-tbl tr.rev-row td[colspan="9"] > div > div:last-child{flex:0 0 100%}
+  .po-tbl tr.rev-row td[colspan="9"] > div > div:last-child .btn{flex:1 1 0;justify-content:center;padding-left:6px;padding-right:6px}
   .po-pager{gap:10px}
   .po-pager .btn{padding:9px 12px}
 }
