@@ -2814,7 +2814,7 @@ function paintPay(){
     + '<div class="pay-sum-narrow">'+narrow
     + '<div class="sum-tot"><span>TOTAL</span><span>'+payM(t.balance)+' owed \u00b7 '+(t.hours||0).toFixed(2)+' hrs</span></div></div></div>';
 
-  var recent='<div class="grid g2" style="margin-top:6px"><div>'+payRecentTime(d.recentTime)+'</div><div>'+payRecentPay(d.recentPay)+'</div></div>';
+  var recent='<div class="grid g2 pay-recent-grid" style="margin-top:6px"><div>'+payRecentTime(d.recentTime)+'</div><div>'+payRecentPay(d.recentPay)+'</div></div>';
 
   w.innerHTML=tiles+actions+panel+'<div id="pay-clock-wrap">'+payClockCard_()+'</div>'+summary+payWoPanel()+recent;
   wirePay();
@@ -2833,7 +2833,7 @@ function payRecentTime(rows){
       + '<button class="btn ghost" style="padding:3px 8px;font-size:11px" data-ptdel="'+r.row+'">✕</button></td></tr>';
   }
   if(!b) b='<tr><td colspan="6" style="color:var(--muted);padding:14px;text-align:center">No time logged yet.</td></tr>';
-  return '<div class="card pad"><div class="section-title" style="margin-top:0">Time entries'+payPager_('t',_tot)+'</div><div class="scroll"><table class="tb"><thead><tr>'+payThSort_('date','Date')+payThSort_('employee','Employee')+payThSort_('wo','WO')+'<th class="num">Hrs</th><th class="num">Amount</th><th></th></tr></thead><tbody>'+b+'</tbody></table></div></div>';
+  return '<div class="card pad"><div class="section-title" style="margin-top:0">Time entries'+payPager_('t',_tot)+'</div><div class="scroll"><table class="tb pay-recent"><thead><tr>'+payThSort_('date','Date')+payThSort_('employee','Employee')+payThSort_('wo','WO')+'<th class="num">Hrs</th><th class="num">Amount</th><th></th></tr></thead><tbody>'+b+'</tbody></table></div></div>';
 }
 function payTimeEditRow(r){
   return '<tr class="rev-row"><td colspan="6"><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:end">'
@@ -2857,7 +2857,7 @@ function payRecentPay(rows){
       + '<td><button class="btn ghost" style="padding:3px 8px;font-size:11px" data-ppdel="'+r.row+'">✕</button></td></tr>';
   }
   if(!b) b='<tr><td colspan="5" style="color:var(--muted);padding:14px;text-align:center">No payments yet.</td></tr>';
-  return '<div class="card pad"><div class="section-title" style="margin-top:0">Payments'+payPager_('p',_tot)+'</div><div class="scroll"><table class="tb"><thead><tr><th>Date</th><th>Employee</th><th class="num">Amount</th><th>From</th><th></th></tr></thead><tbody>'+b+'</tbody></table></div></div>';
+  return '<div class="card pad"><div class="section-title" style="margin-top:0">Payments'+payPager_('p',_tot)+'</div><div class="scroll"><table class="tb pay-recent"><thead><tr><th>Date</th><th>Employee</th><th class="num">Amount</th><th>From</th><th></th></tr></thead><tbody>'+b+'</tbody></table></div></div>';
 }
 
 function payTimeForm(){
