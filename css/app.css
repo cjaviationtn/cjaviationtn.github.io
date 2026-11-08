@@ -136,7 +136,7 @@
   .sheet-rpt .acct-zero{color:#b9b09a}
   .scroll{overflow-x:auto;border-radius:var(--radius)}
 
-  .ledger-box{max-height:calc(100vh - 150px);overflow:auto;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);background:#fff}
+  .ledger-box{max-height:var(--gl-h,calc(100vh - 150px));overflow:auto;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);background:#fff}
   .ledger-box table{min-width:1180px}
   .ledger-box thead th{position:sticky;top:0;z-index:2}
 

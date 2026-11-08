@@ -1123,7 +1123,27 @@ function repaintLedger(){
   head.innerHTML=glHeadRow(); body.innerHTML=glBody(); wireLedger();
   var sub=$('#content .topbar .sub'); if(sub){ var active=Object.keys(GL_FILTERS).length; sub.innerHTML=LEDGER_CACHE.length+' lines · click ▾ on any column to sort &amp; filter'+(active?(' · '+active+' filter'+(active>1?'s':'')+' active'):''); }
 }
-function wireLedger(){
+/* Fit the ledger's scroll box to the window (site 1.6.25): its bottom edge lands at the bottom of the
+   screen whatever sits above it (header, buttons, REVIEW banner, bulk bar), so the page itself barely
+   scrolls and the box does the scrolling. Re-fits on resize/rotate and when anything above it changes height. */
+var GL_FIT_RO=null;
+function glFit(){
+  var box=document.querySelector('#content .ledger-box'); if(!box) return;
+  var y=window.pageYOffset||0, top=box.getBoundingClientRect().top+y;
+  var bar=document.querySelector('.pwabar'), barH=(bar && bar.offsetParent)?bar.offsetHeight:0;
+  box.style.setProperty('--gl-h', Math.max(320, Math.floor(window.innerHeight-top-barH-16))+'px');
+}
+function glFitWire(){
+  glFit();
+  if(!window.__glFitOn){ window.__glFitOn=true; window.addEventListener('resize',function(){ if(current==='ledger') glFit(); }); }
+  if(window.ResizeObserver){
+    if(GL_FIT_RO) GL_FIT_RO.disconnect();
+    GL_FIT_RO=new ResizeObserver(function(){ glFit(); });
+    var els=document.querySelectorAll('#content .topbar,#content .actions,#gl-banner,#gl-bulk');
+    for(var i=0;i<els.length;i++) GL_FIT_RO.observe(els[i]);
+  }
+}
+function wireLedger(){ glFitWire();
   var btns=document.querySelectorAll('#gl-head .fbtn');
   for(var b=0;b<btns.length;b++) btns[b].onclick=function(e){ e.stopPropagation(); openFilter(this.getAttribute('data-key'), this); };
   var ca=document.getElementById('gl-clearall'); if(ca) ca.onclick=function(e){ e.preventDefault(); GL_FILTERS={}; repaintLedger(); };
