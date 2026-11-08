@@ -449,10 +449,17 @@ function actionsBar(){
   var A=DATA.dashboardActions||[];
   var h='<div id="act-flash"></div>';
   h+='<div class="actions"><button class="btn" id="gl-new" onclick="render(\'entry\')">＋ New transaction</button>';
-  for(var k=0;k<A.length;k++) h+='<button class="'+A[k].style+(/^import transactions/i.test(A[k].label||'')?' maroon':'')+'" data-fn="'+esc(A[k].fn)+'" data-confirm="'+(A[k].confirm?'1':'')+'" data-prompt="'+esc(A[k].promptText||'')+'" data-label="'+esc(A[k].label)+'">'+esc(A[k].label)+'</button>';
-  return h+'</div>';
+  for(var k=0;k<A.length;k++){
+    if(A[k].fn==='importAllCsvs'){   /* opens the CSV upload panel (site 1.7.0) instead of running straight off Drive */
+      h+='<button class="btn maroon gli-tog'+(GLI.open?' on':'')+'" id="gli-toggle" aria-expanded="'+(GLI.open?'true':'false')+'">⤒ '+esc(A[k].label)+'</button>'; continue; }
+    h+='<button class="'+A[k].style+(/^import transactions/i.test(A[k].label||'')?' maroon':'')+'" data-fn="'+esc(A[k].fn)+'" data-confirm="'+(A[k].confirm?'1':'')+'" data-prompt="'+esc(A[k].promptText||'')+'" data-label="'+esc(A[k].label)+'">'+esc(A[k].label)+'</button>';
+  }
+  return h+'</div><div id="gli">'+gliPanel()+'</div>';
 }
 function wireActions(){
+  var tg=document.getElementById('gli-toggle');
+  if(tg) tg.onclick=function(){ if(GLI.stage==='busy') return; GLI.open=!GLI.open; paintGli(); };
+  wireGli();
   var wrap=document.querySelector('#content .actions'); if(!wrap) return;
   var btns=wrap.querySelectorAll('button');
   for(var i=0;i<btns.length;i++){ if(!btns[i].getAttribute('data-fn')) continue; btns[i].onclick=function(){
@@ -476,6 +483,202 @@ function wireActions(){
 }
 function reloadLedgerData(){
   google.script.run.withSuccessHandler(function(d){ LEDGER_CACHE=d; if(current==='ledger') repaintLedger(); }).withFailureHandler(function(){}).getLedgerFull();
+}
+
+/* ===================== Import CSVs — General Ledger (site 1.7.0 · API 32) ==============
+   The maroon "Import transactions" button opens this panel instead of running the import
+   straight off Drive. Drop the month's AMEX / VolFed / Venmo / TBX CSVs here; each file is
+   recognised in the browser the same way Importengine.gs detectInstitution_ does, then
+   importUploadCsvs() saves them into Drive › Imports and runs the normal import over the
+   folder (archive, duplicate skipping, transfer matching and REVIEW all unchanged).
+   "Import what's already in Drive" keeps the old one-tap path (runDashboardAction). */
+var GLI={open:false, stage:'empty', files:[], result:null, err:null, msg:null};
+var GLI_MAX=12, GLI_MAX_BYTES=5*1024*1024;
+var GLI_KIND={AMEX:'AMEX','Biz CKG':'Biz CKG','Biz Savings':'Biz Savings',VENMO:'Venmo',TBX:'TBX',MILEIQ:'MileIQ',UNKNOWN:'Unknown'};
+
+/* Port of detectInstitution_ (Importengine.gs) + MileIQ, so the panel shows what the server will see. */
+function gliDetect(filename, text){
+  var f=String(filename||'').toLowerCase(), lines=String(text||'').replace(/^﻿/,'').split(/\r?\n/), head=(lines[0]||'').toLowerCase();
+  if(f.indexOf('mileiq')>-1 || /^rates\s*>>>/.test(head)) return 'MILEIQ';
+  if((head.indexOf('invoice #')>-1 && head.indexOf('labor total')>-1) || f.indexOf('invoicesummary')>-1 || f.indexOf('monthlyinvoice')>-1) return 'TBX';
+  if(f.indexOf('venmo')>-1 || head.indexOf('transaction id')>-1) return 'VENMO';
+  if(head.indexOf('card member')>-1 || f==='activity.csv') return 'AMEX';
+  if(head.indexOf('credit or debit')>-1){
+    for(var i=1;i<lines.length;i++){ var l=lines[i].toLowerCase(); if(l.trim()==='') continue;
+      if(l.indexOf('savings')>-1) return 'Biz Savings';
+      if(l.indexOf('ckg')>-1) return 'Biz CKG';
+      break; }
+    if(f.indexOf('savings')>-1) return 'Biz Savings';
+    if(f.indexOf('ckg')>-1) return 'Biz CKG';
+  }
+  return 'UNKNOWN';
+}
+/* Dated lines and the date range, for the "check the files" list. Rough by design: any
+   line carrying an m/d/yyyy or yyyy-mm-dd date counts as one transaction line. */
+function gliScan(text){
+  var lines=String(text||'').split(/\r?\n/), n=0, lo=null, hi=null;
+  for(var i=1;i<lines.length;i++){
+    var m=/(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(lines[i]), d=null;
+    if(m) d=new Date(+m[3],+m[1]-1,+m[2],12);
+    else { m=/(\d{4})-(\d{2})-(\d{2})/.exec(lines[i]); if(m) d=new Date(+m[1],+m[2]-1,+m[3],12); }
+    if(!d||isNaN(d)) continue;
+    n++; if(!lo||d<lo) lo=d; if(!hi||d>hi) hi=d;
+  }
+  return {lines:n, from:lo, to:hi};
+}
+function gliRange(a,b){
+  if(!a) return '';
+  var M=GL_MON, s=M[a.getMonth()]+' '+a.getDate();
+  if(!b||a.getTime()===b.getTime()) return s+', '+a.getFullYear();
+  return s+(a.getFullYear()!==b.getFullYear()?', '+a.getFullYear():'')+' – '+M[b.getMonth()]+' '+b.getDate()+', '+b.getFullYear();
+}
+function gliChip(kind){ return '<span class="gli-chip k-'+String(kind||'UNKNOWN').replace(/\s+/g,'-').toLowerCase()+'">'+esc(GLI_KIND[kind]||kind||'Unknown')+'</span>'; }
+function gliReady(){ var n=0; for(var i=0;i<GLI.files.length;i++) if(!GLI.files[i].skip) n++; return n; }
+
+function gliPanel(){
+  if(!GLI.open) return '';
+  var h='<div class="card pad gli">';
+  var title={empty:'Import last month’s statements', staged:'Ready to import · '+gliReady()+' file'+(gliReady()===1?'':'s'), busy:'Importing…', done:'Import complete'}[GLI.stage];
+  h+='<div class="gli-head"><div class="section-title" style="margin:0">'+esc(title)+'</div><button class="btn sm ghost" id="gli-close">Close</button></div>';
+  if(GLI.err) h+='<div class="flash err">'+esc(GLI.err)+'</div>';
+  if(GLI.msg) h+='<div class="flash '+(GLI.msg.kind||'ok')+'">'+esc(GLI.msg.text)+'</div>';
+
+  if(GLI.stage==='empty' || GLI.stage==='staged'){
+    h+='<label class="ml-drop gli-drop'+(GLI.stage==='staged'?' slim':'')+'" id="gli-drop"><input type="file" id="gli-file" multiple accept=".csv,text/csv" style="display:none">'
+      +(GLI.stage==='staged'
+        ? '<div><strong>Add more files</strong> <span class="hint">— drop here or tap</span></div>'
+        : '<div><strong>Drop last month’s CSVs here</strong><br><span class="hint">or tap to choose — AMEX, VolFed checking &amp; savings, Venmo, TBX · several at once is fine</span></div>')
+      +'</label>';
+  }
+  if(GLI.stage==='empty'){
+    h+='<div class="hint" style="margin-top:8px">Each file is recognised by its columns. After it posts, the original is filed in Drive › Imports › Archive as the month’s backup. '
+      +'<a href="#" id="gli-drive">Import what’s already in Drive › Imports</a></div>';
+  }
+  if(GLI.stage==='staged'){
+    h+='<div class="gli-list">';
+    for(var i=0;i<GLI.files.length;i++){ var f=GLI.files[i];
+      var detail = f.skip==='MILEIQ' ? 'MileIQ log — goes on the Mileage tab, not here'
+                 : f.skip==='UNKNOWN' ? 'Not recognised — the importer would skip it. Check it’s the bank’s CSV export.'
+                 : f.skip==='EMPTY' ? 'No dated lines in this file'
+                 : (f.range?f.range+' · ':'')+f.lines+' line'+(f.lines===1?'':'s');
+      h+='<div class="gli-row'+(f.skip?' skip':'')+'">'+gliChip(f.kind)
+        +'<div class="gli-name"><div class="nm">'+esc(f.name)+'</div><div class="hint" style="margin:0">'+esc(detail)+'</div></div>'
+        +'<span class="gli-stat '+(f.skip?'warnc':'ok')+'">'+(f.skip==='MILEIQ'?'<a href="#" data-gli-mileage>Mileage tab</a>':(f.skip?'Won’t import':'Ready'))+'</span>'
+        +'<button class="gli-x" data-gli-rm="'+i+'" aria-label="Remove '+esc(f.name)+'" title="Remove">✕</button></div>';
+    }
+    h+='</div>';
+    var n=gliReady();
+    h+='<div class="gli-go"><button class="btn maroon" id="gli-run"'+(n?'':' disabled')+'>Import '+n+' file'+(n===1?'':'s')+'</button>'
+      +'<button class="btn ghost" id="gli-cancel">Cancel</button>'
+      +'<span class="hint" style="margin:0">Nothing touches the ledger until you press Import. Re-importing a file is safe — lines already there are skipped.</span></div>';
+  }
+  if(GLI.stage==='busy'){
+    h+='<div class="miniload"><div class="spin"></div>Uploading '+gliReady()+' file'+(gliReady()===1?'':'s')+' and posting to the ledger… this can take a minute.</div>';
+  }
+  if(GLI.stage==='done' && GLI.result){ h+=gliResult(GLI.result); }
+  return h+'</div>';
+}
+function gliResult(r){
+  var F=r.files||[], up={}, i, tf=0, td=0, tr=0, tt=0;
+  for(i=0;i<(r.uploaded||[]).length;i++) up[r.uploaded[i]]=true;
+  for(i=0;i<F.length;i++){ tf+=F[i].found||0; td+=F[i].duplicates||0; tr+=F[i].review||0; tt+=F[i].transfers||0; }
+  var h='<div class="flash ok">✓ '+tf+' new line'+(tf===1?'':'s')+' imported'+(tt?' ('+tt+' as transfers between your accounts)':'')
+    +' · '+td+' already in the ledger, skipped · '+tr+' need'+(tr===1?'s':'')+' an account (REVIEW).</div>';
+  if(F.length){
+    h+='<div class="gli-tbl"><table class="tb"><thead><tr><th>File</th><th class="num">New lines</th><th class="num">Skipped</th><th class="num">REVIEW</th><th>Note</th></tr></thead><tbody>';
+    for(i=0;i<F.length;i++){ var f=F[i], note=[];
+      if(f.kind==='UNKNOWN') note.push('Not recognised — nothing imported; logged to Skipped Transactions');
+      if(f.kind==='TBX') note.push('invoices');
+      if(f.transfers) note.push(f.transfers+' matched as transfers');
+      if(f.adjustments) note.push(f.adjustments+' AMEX adjustment'+(f.adjustments>1?'s':'')+' skipped (net to zero)');
+      if(f.duplicates) note.push('duplicates logged to Skipped Transactions');
+      if(r.uploaded && !up[f.name]) note.push('was already waiting in Drive › Imports');
+      h+='<tr><td>'+gliChip(f.kind)+' <span class="gli-fn">'+esc(f.name)+'</span></td><td class="num"><b>'+(f.found||0)+'</b></td><td class="num">'+(f.duplicates||0)+'</td>'
+        +'<td class="num'+(f.review?' warnc':'')+'"><b>'+(f.review||0)+'</b></td><td class="hint" style="margin:0">'+esc(note.join(' · '))+'</td></tr>';
+    }
+    h+='</tbody></table></div>';
+  }
+  h+='<details class="gli-rpt"><summary>Full import report</summary><pre>'+esc(r.message||'')+'</pre></details>';
+  h+='<div class="gli-go">'+(tr?'<button class="btn" id="gli-review">Show the '+tr+' REVIEW line'+(tr===1?'':'s')+'</button>':'')
+    +'<button class="btn ghost" id="gli-done">Done</button><span class="hint" style="margin:0">Originals moved to Drive › Imports › Archive.</span></div>';
+  return h;
+}
+function paintGli(){
+  var w=document.getElementById('gli'); if(!w) return;
+  w.innerHTML=gliPanel(); wireGli();
+  var t=document.getElementById('gli-toggle'); if(t){ t.classList.toggle('on',GLI.open); t.setAttribute('aria-expanded',GLI.open?'true':'false'); }
+  if(current==='ledger') glFit();
+}
+function gliAddFiles(list){
+  GLI.err=null; GLI.msg=null;
+  var arr=[], i; for(i=0;i<(list?list.length:0);i++) arr.push(list[i]);
+  if(!arr.length) return;
+  var left=arr.length, problems=[];
+  function done(){ if(--left>0) return;
+    if(problems.length) GLI.err=problems.join('\n');
+    GLI.stage=GLI.files.length?'staged':'empty'; paintGli(); }
+  arr.forEach(function(file){
+    if(!/\.csv$/i.test(file.name)){ problems.push(file.name+' is not a .csv file — skipped.'); return done(); }
+    if(file.size>GLI_MAX_BYTES){ problems.push(file.name+' is over 5 MB — skipped.'); return done(); }
+    var fr=new FileReader();
+    fr.onload=function(){
+      var text=String(fr.result||''), kind=gliDetect(file.name,text), sc=gliScan(text);
+      var rec={name:file.name, kind:kind, lines:sc.lines, range:gliRange(sc.from,sc.to), b64:btoa(unescape(encodeURIComponent(text))),
+               skip:(kind==='MILEIQ'||kind==='UNKNOWN')?kind:(sc.lines?null:'EMPTY')};
+      if(kind==='TBX') rec.skip=null;   /* TBX summaries can carry no row dates; let the server decide */
+      for(var j=0;j<GLI.files.length;j++) if(GLI.files[j].name===rec.name){ GLI.files.splice(j,1); break; }   /* same name again = replace */
+      if(GLI.files.length>=GLI_MAX) problems.push('Only '+GLI_MAX+' files at a time — '+file.name+' left out.');
+      else GLI.files.push(rec);
+      done();
+    };
+    fr.onerror=function(){ problems.push('Could not read '+file.name+'.'); done(); };
+    fr.readAsText(file);
+  });
+}
+function gliRun(){
+  var send=[]; for(var i=0;i<GLI.files.length;i++){ var f=GLI.files[i]; if(!f.skip) send.push({name:f.name, base64:f.b64}); }
+  if(!send.length) return;
+  GLI.stage='busy'; GLI.err=null; GLI.msg=null; paintGli();
+  google.script.run
+    .withSuccessHandler(function(res){
+      GLI.result=res||{}; GLI.stage='done'; GLI.files=[]; paintGli();
+      google.script.run.withSuccessHandler(function(s){ if(s) DATA.ledgerUpdated=s; }).getLedgerUpdated();
+      LEDGER_CACHE=null; reloadLedgerData(); glRefreshReports();
+    })
+    .withFailureHandler(function(e){
+      GLI.stage='staged';
+      GLI.err='Import failed: '+(e.message||e)+'\nIf the files were already saved, they are waiting in Drive › Imports — pressing Import again is safe (duplicates are skipped).';
+      paintGli();
+    })
+    .importUploadCsvs(send);
+}
+function wireGli(){
+  var inp=document.getElementById('gli-file'), drop=document.getElementById('gli-drop');
+  if(inp) inp.onchange=function(){ gliAddFiles(this.files); this.value=''; };
+  if(drop){
+    drop.ondragover=function(e){ e.preventDefault(); drop.classList.add('over'); };
+    drop.ondragleave=function(){ drop.classList.remove('over'); };
+    drop.ondrop=function(e){ e.preventDefault(); drop.classList.remove('over'); gliAddFiles(e.dataTransfer&&e.dataTransfer.files); };
+  }
+  var rm=document.querySelectorAll('[data-gli-rm]');
+  for(var i=0;i<rm.length;i++) rm[i].onclick=function(e){ e.preventDefault(); GLI.files.splice(parseInt(this.getAttribute('data-gli-rm'),10),1); GLI.err=null; GLI.stage=GLI.files.length?'staged':'empty'; paintGli(); };
+  var ml=document.querySelectorAll('[data-gli-mileage]');
+  for(var k=0;k<ml.length;k++) ml[k].onclick=function(e){ e.preventDefault(); render('mileage'); };
+  var cl=document.getElementById('gli-close'); if(cl) cl.onclick=function(){ if(GLI.stage==='busy') return; GLI.open=false; if(GLI.stage==='done'){ GLI.stage='empty'; GLI.result=null; } paintGli(); };
+  var cn=document.getElementById('gli-cancel'); if(cn) cn.onclick=function(){ GLI.files=[]; GLI.err=null; GLI.stage='empty'; paintGli(); };
+  var go=document.getElementById('gli-run'); if(go) go.onclick=gliRun;
+  var dn=document.getElementById('gli-done'); if(dn) dn.onclick=function(){ GLI.open=false; GLI.stage='empty'; GLI.result=null; paintGli(); };
+  var rv=document.getElementById('gli-review'); if(rv) rv.onclick=function(){ GLI.open=false; GLI.stage='empty'; GLI.result=null; paintGli(); GL_FILTERS={account:{'REVIEW':true}}; if(LEDGER_CACHE) repaintLedger(); };
+  var dr=document.getElementById('gli-drive'); if(dr) dr.onclick=function(e){ e.preventDefault();
+    if(!confirm('Import whatever CSVs are already sitting in Drive › Imports?')) return;
+    GLI.err=null; GLI.msg={kind:'busy',text:'Importing from Drive › Imports…'}; paintGli();
+    google.script.run
+      .withSuccessHandler(function(res){ GLI.msg={kind:'ok',text:(res&&res.message)||'Import ran.'}; paintGli();
+        google.script.run.withSuccessHandler(function(s){ if(s) DATA.ledgerUpdated=s; }).getLedgerUpdated();
+        LEDGER_CACHE=null; reloadLedgerData(); glRefreshReports(); })
+      .withFailureHandler(function(e){ GLI.msg=null; GLI.err=e.message||String(e); paintGli(); })
+      .runDashboardAction('importAllCsvs', null);
+  };
 }
 
 
@@ -1139,7 +1342,7 @@ function glFitWire(){
   if(window.ResizeObserver){
     if(GL_FIT_RO) GL_FIT_RO.disconnect();
     GL_FIT_RO=new ResizeObserver(function(){ glFit(); });
-    var els=document.querySelectorAll('#content .topbar,#content .actions,#gl-banner,#gl-bulk');
+    var els=document.querySelectorAll('#content .topbar,#content .actions,#gli,#gl-banner,#gl-bulk');
     for(var i=0;i<els.length;i++) GL_FIT_RO.observe(els[i]);
   }
 }
