@@ -182,7 +182,7 @@ function render(v){
   var btns=document.querySelectorAll('#nav button');
   var navV=(v==='entry')?'ledger':v;   /* New Transaction lives under the General Ledger */
   for(var i=0;i<btns.length;i++) btns[i].classList.toggle('active',btns[i].getAttribute('data-view')===navV);
-  renderMnav(); if(v!=='bench' && v!=='clock') injectPrintControls();  /* nothing to print on Bench Stock (own print) or the Time Clock */
+  renderMnav(); injectPrintControls(v!=='bench' && v!=='clock');  /* nothing to print on Bench Stock (own print) or the Time Clock */
   if(v==='dashboard') loadDash();
   if(v==='pl'||v==='bs'||v==='equity') wireFY();
   if(v==='entry') wireEntry();
@@ -221,14 +221,27 @@ function printHead(title){
   var logo = LOGO_URI ? '<img class="plogo" src="'+LOGO_URI+'">' : '<div class="logo-badge"></div>';
   return '<div class="print-head">'+logo+'<div><div class="co">C&J AVIATION LLC — '+esc(title)+'</div><div class="meta">'+fyLabel()+' · printed '+d+'</div></div></div>';
 }
-function topbar(title,sub,tag){ return '<div class="topbar"><div><h2>'+title+'</h2><div class="sub">'+sub+'</div></div>'+(tag===false?'':'<div><span class="pill">'+(tag||'live · from your sheet')+'</span></div>')+'</div>'; }   /* tag===false: no pill (Dashboard puts it in its bottom bar, site 1.6.15) */
+function topbar(title,sub,tag){ return '<div class="topbar"'+(tag===false?'':' data-tag="'+esc(tag||'live · from your sheet')+'"')+'><div><h2>'+title+'</h2><div class="sub">'+sub+'</div></div></div>'; }   /* tag===false: no pill (Dashboard puts it in its bottom bar, site 1.6.15) */
 
 
-function injectPrintControls(){
-  var slot=$('#content #print-slot'), tb=$('#content .topbar'); if(!slot && !tb) return;
+/* The live tag and Print / Export sit in a bar at the BOTTOM of every tab (site 1.6.24, like the
+   Dashboard since 1.6.15). A page that already has a bottom bar marks its spot with #print-slot;
+   otherwise one is added at the end of #content. withPrint=false: tag only (Bench Stock, Time Clock). */
+function injectPrintControls(withPrint){
+  var c=$('#content'); if(!c) return;
+  var tb=$('#content .topbar'), tag=tb?tb.getAttribute('data-tag'):'';
+  var slot=$('#content #print-slot');
+  if(!slot){
+    if(!tag && !withPrint) return;
+    var bar=document.createElement('div'); bar.className='fin-foot page-foot';
+    bar.innerHTML='<div class="fin-foot-r" id="print-slot"></div>';
+    c.appendChild(bar); slot=bar.firstChild;
+  }
+  if(tag && !slot.querySelector('.pill')){ var pill=document.createElement('span'); pill.className='pill'; pill.textContent=tag; slot.appendChild(pill); }
+  if(!withPrint) return;
   var wrap=document.createElement('div'); wrap.className='print-controls';
   wrap.innerHTML='<button class="btn sm ghost" id="printOne">🖨 Print / PDF this page</button><button class="btn sm gold" id="printAll">📄 Export all</button>';
-  (slot||tb.lastElementChild).appendChild(wrap);
+  slot.appendChild(wrap);
   $('#printOne').onclick=function(){ window.print(); };
   $('#printAll').onclick=printAll;
 }
@@ -518,7 +531,7 @@ function fySelectHtml(){
   for(var i=0;i<ys.length;i++) h+='<option value="'+ys[i]+'"'+(ys[i]===FY_YEAR?' selected':'')+'>'+ys[i]+'</option>';
   return h+'</select></label>'+(FY_BUSY?'<span class="fy-busy"><span class="spin"></span>Loading '+FY_YEAR+'\u2026</span>':'');
 }
-function fyToolsHtml(hint){ var sel=fySelectHtml(); if(!sel) return ''; return '<div class="fin-tools fin-foot">'+sel+(hint?'<span class="hint">'+hint+'</span>':'')+'</div>'; }   /* bottom of the page since site 1.6.14 */
+function fyToolsHtml(hint){ var sel=fySelectHtml(); if(!sel) return ''; return '<div class="fin-tools fin-foot">'+sel+'<div class="fin-foot-r" id="print-slot"></div>'+(hint?'<span class="hint">'+hint+'</span>':'')+'</div>'; }   /* bottom of the page since site 1.6.14 */
 function wireFY(){ var sel=$('#fy-sel'); if(sel) sel.onchange=function(){ fySet(parseInt(sel.value,10)); }; }
 function fySet(y){ if(!(y>1900)||y===FY_YEAR) return; FY_YEAR=y; FY_BUSY=true; render(current); fyRefresh(); }
 /* Re-pull the statements for FY_YEAR (also used after every ledger edit — see glRefreshReports). */
@@ -2777,7 +2790,7 @@ function paintPay(){
       + '<td class="num">'+(s.hours||0).toFixed(2)+'</td></tr>';
   }
   body+='<tr class="tot"><td>TOTAL</td><td></td><td></td><td></td><td></td><td></td><td class="num">'+money(t.earned)+'</td><td class="num">'+money(t.paid)+'</td><td class="num">'+payM(t.balance)+'</td><td class="num">'+(t.hours||0).toFixed(2)+'</td></tr>';
-  var summary='<div class="card pad" style="margin-bottom:18px"><div class="section-title" style="margin-top:0">Summary by employee</div><div class="pay-sum-wide"><div class="scroll"><table class="tb" style="table-layout:fixed;min-width:1000px"><thead><tr><th style="width:13%">Employee</th><th style="width:9%">Role / Notes</th><th class="num" style="width:9%">Hire Date</th><th class="num" style="width:9%">Last Raise</th><th class="num" style="width:22%">Next Raise</th><th class="num" style="width:8%">Rate</th><th class="num" style="width:9%">Earned</th><th class="num" style="width:9%">Paid</th><th class="num" style="width:7%">Balance</th><th class="num" style="width:5%">Hours</th></tr></thead><tbody>'+body+'</tbody></table></div></div>'
+  var summary='<div class="card pad pay-sum-box" style="margin-bottom:18px"><div class="section-title" style="margin-top:0">Summary by employee</div><div class="pay-sum-wide"><div class="scroll"><table class="tb pay-sum-tbl"><thead><tr><th>Employee</th><th>Role / Notes</th><th class="num">Hire Date</th><th class="num">Last Raise</th><th class="num">Next Raise</th><th class="num">Rate</th><th class="num">Earned</th><th class="num">Paid</th><th class="num">Balance</th><th class="num">Hours</th></tr></thead><tbody>'+body+'</tbody></table></div></div>'
     + '<div class="pay-sum-narrow">'+narrow
     + '<div class="sum-tot"><span>TOTAL</span><span>'+payM(t.balance)+' owed \u00b7 '+(t.hours||0).toFixed(2)+' hrs</span></div></div></div>';
 
