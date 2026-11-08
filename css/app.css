@@ -154,6 +154,11 @@
   .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
   label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
   input,select,textarea{width:100%;background:#fff;border:1px solid var(--line);color:var(--ink);padding:11px 12px;border-radius:9px;font-size:14px;font-family:inherit}
+  /* iOS Safari sizes a native date input to its own content and ignores width:100%, so it spills into
+     the next column, sits taller than its neighbours and centres its text. Un-style it everywhere. */
+  .form-row>*{min-width:0}
+  input[type=date]{-webkit-appearance:none;appearance:none;display:block;box-sizing:border-box;min-width:0;max-width:100%;height:41px;padding-top:0;padding-bottom:0;text-align:left}
+  input[type=date]::-webkit-date-and-time-value{margin:0;text-align:left}
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--navy-l);box-shadow:0 0 0 3px rgba(43,72,101,.1)}
   .btn{display:inline-flex;align-items:center;gap:6px;background:var(--navy);color:#fff;border:none;padding:11px 18px;border-radius:9px;font-weight:700;font-size:13.5px;cursor:pointer;transition:.15s}
   .btn:hover{background:var(--navy-d)} .btn:disabled{opacity:.5;cursor:not-allowed}
