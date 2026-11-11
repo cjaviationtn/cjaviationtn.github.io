@@ -266,7 +266,7 @@ function vDashboard(){
   +(FY_LOADED?'<div class="section-title" style="margin-top:0">Money at a glance</div>'+F.kpis
   +'<div class="section-title">Financial statements</div>'+F.statements:finWait())
   +'<div class="fin-tools fin-foot">'+fySelectHtml()+'<label class="fin-chk"><input type="checkbox" id="fin-zero"'+(FIN_SHOW_ZERO?' checked':'')+'> Show $0 accounts</label>'
-  +'<div class="fin-foot-r" id="print-slot"><span class="pill">'+(FY_SRC==='ledger'?'computed from your General Ledger':'from the sheet tabs')+'</span></div>'
+  +'<div class="fin-foot-r" id="print-slot"><span class="pill">'+(!FY_LOADED?'working it out\u2026':FY_SRC==='ledger'?'computed from your General Ledger':'from the sheet tabs (ledger calc failed)')+'</span></div>'
   +'<span class="hint">'+(fySelectHtml()?'Statements above are for the selected year; the balance sheet is as of Dec 31 for past years. ':'')+'Hidden rows are accounts with nothing in them for '+FY_YEAR+'. Each statement has its own Print button. "Print / PDF this page" prints the summary and all three statements, one per page.</span></div>'
   +'</div>';
 }
