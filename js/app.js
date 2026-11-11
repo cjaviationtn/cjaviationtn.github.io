@@ -60,7 +60,7 @@ function boot(){
   $('#root').innerHTML='<div class="loading"><div><div class="spin"></div>'+(isCrew()?'Loading…':'Loading codger headquarters…')+'</div></div>';
   NAV = isCrew() ? NAV_CREW : NAV_ADMIN;
   var run=google.script.run
-    .withSuccessHandler(function(d){ DATA=d; if(!isCrew()){ FY_LOADED=false; FY_BUSY=true; } buildShell(); render(viewFromHash()); if(!isCrew()) fyRefresh(); })   /* site 1.7.1: statements always computed from the ledger (getStatements), never the sheet tabs */
+    .withSuccessHandler(function(d){ DATA=d; var led=(d&&d.fySource==='ledger'); if(led) FY_SRC='ledger'; if(!isCrew()&&!led){ FY_LOADED=false; FY_BUSY=true; } buildShell(); render(viewFromHash()); if(!isCrew()&&!led) fyRefresh(); })   /* API 33: getBootstrap already returns the ledger-computed statements (fySource 'ledger', server-cached); older backends fall back to a second call (site 1.7.1 behaviour) */
     .withFailureHandler(function(e){
       if(e && e.code==='AUTH'){ showSignIn(''); return; }
       $('#root').innerHTML='<div class="loading"><div>Could not load the sheet.<br><span class="hint">'+esc(e.message||e)+'</span><br><br><button class="btn ghost sm" onclick="boot()">Try again</button></div></div>'; });
@@ -265,7 +265,7 @@ function vDashboard(){
   +'<div id="fin-ops">'+opsSection()+'</div>'
   +(FY_LOADED?'<div class="section-title" style="margin-top:0">Money at a glance</div>'+F.kpis
   +'<div class="section-title">Financial statements</div>'+F.statements:finWait())
-  +'<div class="fin-tools fin-foot">'+fySelectHtml()+'<label class="fin-chk"><input type="checkbox" id="fin-zero"'+(FIN_SHOW_ZERO?' checked':'')+'> Show $0 accounts</label>'
+  +'<div class="fin-tools fin-foot">'+fySelectHtml()+fyRecalcHtml()+'<label class="fin-chk"><input type="checkbox" id="fin-zero"'+(FIN_SHOW_ZERO?' checked':'')+'> Show $0 accounts</label>'
   +'<div class="fin-foot-r" id="print-slot"><span class="pill">'+(!FY_LOADED?'working it out\u2026':FY_SRC==='ledger'?'computed from your General Ledger':'from the sheet tabs (ledger calc failed)')+'</span></div>'
   +'<span class="hint">'+(fySelectHtml()?'Statements above are for the selected year; the balance sheet is as of Dec 31 for past years. ':'')+'Hidden rows are accounts with nothing in them for '+FY_YEAR+'. Each statement has its own Print button. "Print / PDF this page" prints the summary and all three statements, one per page.</span></div>'
   +'</div>';
@@ -735,18 +735,20 @@ function fySelectHtml(){
   for(var i=0;i<ys.length;i++) h+='<option value="'+ys[i]+'"'+(ys[i]===FY_YEAR?' selected':'')+'>'+ys[i]+'</option>';
   return h+'</select></label>'+(FY_BUSY?'<span class="fy-busy"><span class="spin"></span>Loading '+FY_YEAR+'\u2026</span>':'');
 }
-function fyToolsHtml(hint){ var sel=fySelectHtml(); if(!sel) return ''; return '<div class="fin-tools fin-foot">'+sel+'<div class="fin-foot-r" id="print-slot"></div>'+(hint?'<span class="hint">'+hint+'</span>':'')+'</div>'; }   /* bottom of the page since site 1.6.14 */
-function wireFY(){ var sel=$('#fy-sel'); if(sel) sel.onchange=function(){ fySet(parseInt(sel.value,10)); }; }
+function fyToolsHtml(hint){ var sel=fySelectHtml(); return '<div class="fin-tools fin-foot">'+sel+fyRecalcHtml()+'<div class="fin-foot-r" id="print-slot"></div>'+(hint?'<span class="hint">'+hint+'</span>':'')+'</div>'; }   /* bottom of the page since site 1.6.14 */
+function wireFY(){ var sel=$('#fy-sel'); if(sel) sel.onchange=function(){ fySet(parseInt(sel.value,10)); }; var rc=document.querySelectorAll('.fy-recalc'); for(var i=0;i<rc.length;i++) rc[i].onclick=function(ev){ ev.preventDefault(); fyRecalc(); }; }
+function fyRecalcHtml(){ return FY_BUSY?'':'<a href="#" class="fy-recalc" title="Statements are saved on the server for speed. Use this if you changed the ledger outside the site.">Recalculate</a>'; }
+function fyRecalc(){ if(FY_BUSY) return; FY_BUSY=true; render(current); fyRefresh(true); }   /* Recalculate link: rebuild from the ledger, ignoring the server cache */
 function fySet(y){ if(!(y>1900)||y===FY_YEAR) return; FY_YEAR=y; FY_BUSY=true; render(current); fyRefresh(); }
 /* Re-pull the statements for FY_YEAR (also used after every ledger edit — see glRefreshReports). */
-function fyRefresh(){
+function fyRefresh(force){
   google.script.run.withSuccessHandler(function(rep){
     FY_BUSY=false; FY_LOADED=true; if(!rep||!DATA) return; FY_SRC='ledger';
     DATA.incomeStatement=rep.incomeStatement; DATA.balanceSheet=rep.balanceSheet; DATA.memberEquity=rep.memberEquity;
     if(rep.years) DATA.fyYears=rep.years;
     DATA.tbx=rep.tbx; DATA.salesTax=rep.salesTax; DATA.ledgerUpdated=rep.ledgerUpdated; TBX_SEL=null; TBX_SEL_DATA=null;
     if(/^(dashboard|pl|bs|equity)$/.test(current)) render(current);
-  }).withFailureHandler(function(e){ var first=!FY_LOADED; FY_BUSY=false; FY_LOADED=true; console.error('getStatements('+FY_YEAR+') failed', e); if(/^(dashboard|pl|bs|equity)$/.test(current)) render(current); if(first) return; alert('Could not load '+FY_YEAR+' statements: '+(e.message||e)); }).getStatements(FY_YEAR);
+  }).withFailureHandler(function(e){ var first=!FY_LOADED; FY_BUSY=false; FY_LOADED=true; console.error('getStatements('+FY_YEAR+') failed', e); if(/^(dashboard|pl|bs|equity)$/.test(current)) render(current); if(first) return; alert('Could not load '+FY_YEAR+' statements: '+(e.message||e)); }).getStatements(FY_YEAR, force===true);
 }
 try{ FIN_SHOW_ZERO=(localStorage.getItem('cj_fin_zero')==='1'); FIN_COLLAPSED=JSON.parse(localStorage.getItem('cj_fin_collapsed')||'{}')||{}; }catch(e){}
 
