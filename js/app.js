@@ -60,7 +60,7 @@ function boot(){
   $('#root').innerHTML='<div class="loading"><div><div class="spin"></div>'+(isCrew()?'Loading…':'Loading codger headquarters…')+'</div></div>';
   NAV = isCrew() ? NAV_CREW : NAV_ADMIN;
   var run=google.script.run
-    .withSuccessHandler(function(d){ DATA=d; buildShell(); render(viewFromHash()); })
+    .withSuccessHandler(function(d){ DATA=d; if(!isCrew()){ FY_LOADED=false; FY_BUSY=true; } buildShell(); render(viewFromHash()); if(!isCrew()) fyRefresh(); })   /* site 1.7.1: statements always computed from the ledger (getStatements), never the sheet tabs */
     .withFailureHandler(function(e){
       if(e && e.code==='AUTH'){ showSignIn(''); return; }
       $('#root').innerHTML='<div class="loading"><div>Could not load the sheet.<br><span class="hint">'+esc(e.message||e)+'</span><br><br><button class="btn ghost sm" onclick="boot()">Try again</button></div></div>'; });
@@ -263,10 +263,10 @@ function vDashboard(){
   return topbar('Dashboard','Shop operations · financial statements · '+fyLabel()+' · pulled live from your General Ledger'+(DATA.ledgerUpdated?'  ·  <span class="lupd">Ledger last updated: '+esc(DATA.ledgerUpdated)+'</span>':''),false)
   +'<div class="fin-page'+(FIN_SHOW_ZERO?' show-zero':'')+'" id="fin-page">'
   +'<div id="fin-ops">'+opsSection()+'</div>'
-  +'<div class="section-title" style="margin-top:0">Money at a glance</div>'+F.kpis
-  +'<div class="section-title">Financial statements</div>'+F.statements
+  +(FY_LOADED?'<div class="section-title" style="margin-top:0">Money at a glance</div>'+F.kpis
+  +'<div class="section-title">Financial statements</div>'+F.statements:finWait())
   +'<div class="fin-tools fin-foot">'+fySelectHtml()+'<label class="fin-chk"><input type="checkbox" id="fin-zero"'+(FIN_SHOW_ZERO?' checked':'')+'> Show $0 accounts</label>'
-  +'<div class="fin-foot-r" id="print-slot"><span class="pill">live · from your sheet</span></div>'
+  +'<div class="fin-foot-r" id="print-slot"><span class="pill">'+(FY_SRC==='ledger'?'computed from your General Ledger':'from the sheet tabs')+'</span></div>'
   +'<span class="hint">'+(fySelectHtml()?'Statements above are for the selected year; the balance sheet is as of Dec 31 for past years. ':'')+'Hidden rows are accounts with nothing in them for '+FY_YEAR+'. Each statement has its own Print button. "Print / PDF this page" prints the summary and all three statements, one per page.</span></div>'
   +'</div>';
 }
@@ -708,9 +708,9 @@ function sheetReport(arr,title,subtitle,amountLabel){
     +'<table><thead><tr class="s-head"><th>Account</th><th class="num">'+esc(amountLabel)+'</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 function vPL(){ return topbar('Income Statement','Profit &amp; Loss · '+fyLabel())
-  +sheetReport(DATA.incomeStatement,'C&J AVIATION LLC — Income Statement (P&L)','For the Period Ending: '+fyLabel()+' (Jan - Dec) · auto-calculated from the General Ledger','Amount (USD)')+fyToolsHtml(); }
+  +(!FY_LOADED?finWait():'')+(!FY_LOADED?'':sheetReport(DATA.incomeStatement,'C&J AVIATION LLC — Income Statement (P&L)','For the Period Ending: '+fyLabel()+' (Jan - Dec) · auto-calculated from the General Ledger','Amount (USD)'))+fyToolsHtml(); }
 function vBS(){ return topbar('Balance Sheet','Assets = Liabilities + Equity · '+fyLabel())
-  +sheetReport(DATA.balanceSheet,'C&J AVIATION LLC — Balance Sheet','As of: '+(fyIsCurrent()?'today':'Dec 31, '+FY_YEAR)+' ('+fyLabel()+') · Assets = Liabilities + Equity · Balance Check must equal $0.00','Balance (USD)')+fyToolsHtml(); }
+  +(!FY_LOADED?finWait():'')+(!FY_LOADED?'':sheetReport(DATA.balanceSheet,'C&J AVIATION LLC — Balance Sheet','As of: '+(fyIsCurrent()?'today':'Dec 31, '+FY_YEAR)+' ('+fyLabel()+') · Assets = Liabilities + Equity · Balance Check must equal $0.00','Balance (USD)'))+fyToolsHtml(); }
 
 /* ---------- DASHBOARD FINANCIALS (Income Statement + Balance Sheet + Member Equity) ---------- */
 /* Rendered inside vDashboard. Reads the same DATA.incomeStatement / DATA.balanceSheet /
@@ -723,7 +723,8 @@ var FIN_SHOW_ZERO=false, FIN_COLLAPSED={};
    Picking another year calls getStatements(year), which rebuilds all three statements from the
    ledger in code, and swaps them into DATA so every view renders unchanged. FY_YEAR is not
    persisted: a reload comes back on the current year. */
-var FY_YEAR=new Date().getFullYear(), FY_BUSY=false;
+var FY_YEAR=new Date().getFullYear(), FY_BUSY=false, FY_LOADED=true, FY_SRC='sheet';   /* FY_LOADED false until the first getStatements returns after boot */
+function finWait(){ return '<div class="card pad fin-wait"><span class="spin"></span> Working out '+FY_YEAR+' from the General Ledger\u2026</div>'; }
 function fyYears(){ var ys=((DATA&&DATA.fyYears)||[]).slice(); if(ys.indexOf(FY_YEAR)===-1) ys.push(FY_YEAR); ys.sort(); return ys; }
 function fyLabel(){ return 'Fiscal Year '+FY_YEAR; }
 function fyIsCurrent(){ return FY_YEAR===new Date().getFullYear(); }
@@ -740,12 +741,12 @@ function fySet(y){ if(!(y>1900)||y===FY_YEAR) return; FY_YEAR=y; FY_BUSY=true; r
 /* Re-pull the statements for FY_YEAR (also used after every ledger edit — see glRefreshReports). */
 function fyRefresh(){
   google.script.run.withSuccessHandler(function(rep){
-    FY_BUSY=false; if(!rep||!DATA) return;
+    FY_BUSY=false; FY_LOADED=true; if(!rep||!DATA) return; FY_SRC='ledger';
     DATA.incomeStatement=rep.incomeStatement; DATA.balanceSheet=rep.balanceSheet; DATA.memberEquity=rep.memberEquity;
     if(rep.years) DATA.fyYears=rep.years;
     DATA.tbx=rep.tbx; DATA.salesTax=rep.salesTax; DATA.ledgerUpdated=rep.ledgerUpdated; TBX_SEL=null; TBX_SEL_DATA=null;
     if(/^(dashboard|pl|bs|equity)$/.test(current)) render(current);
-  }).withFailureHandler(function(e){ FY_BUSY=false; if(/^(dashboard|pl|bs|equity)$/.test(current)) render(current); alert('Could not load '+FY_YEAR+' statements: '+(e.message||e)); }).getStatements(FY_YEAR);
+  }).withFailureHandler(function(e){ var first=!FY_LOADED; FY_BUSY=false; FY_LOADED=true; console.error('getStatements('+FY_YEAR+') failed', e); if(/^(dashboard|pl|bs|equity)$/.test(current)) render(current); if(first) return; alert('Could not load '+FY_YEAR+' statements: '+(e.message||e)); }).getStatements(FY_YEAR);
 }
 try{ FIN_SHOW_ZERO=(localStorage.getItem('cj_fin_zero')==='1'); FIN_COLLAPSED=JSON.parse(localStorage.getItem('cj_fin_collapsed')||'{}')||{}; }catch(e){}
 
@@ -930,6 +931,7 @@ function wireFin(){
 
 
 function vEquity(){
+  if(!FY_LOADED) return topbar('LLC Member Equity',fyLabel()+' · 50 / 50 ownership · auto-calculated from the ledger')+finWait()+fyToolsHtml();
   var g=DATA.memberEquity||[];
 
   var head=-1;
