@@ -2180,10 +2180,14 @@ function poImpIsPartTok(w){
   if(/^\d+(\/\d+)?$/.test(w) && w.length<5) return false;          /* 1/4, 100 */
   if(/^\d+(\.\d+)?(MM|CM|IN|FT|OZ|LB|LBS|QT|GAL|PK|PC|PCS|V|W|A|AMP|PSI|DEG|%)$/i.test(w)) return false; /* 18MM, 4.7OZ */
   if(/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(w)) return false;        /* dates */
+  if(/^(19|20)\d{2}(\.\d)?-(19|20)\d{2}$/.test(w)) return false;  /* model years 2010-2026, 2007.5-2024 */
   return /^[A-Z0-9][A-Z0-9\-\/\.]*[A-Z0-9]$/i.test(w);
 }
 function poImpSplitPart(desc, spruce){
   var s=String(desc||'').replace(/\s+/g,' ').replace(/^\s+|\s+$/g,''), w=s.split(' '), i, pick=-1;
+  /* a labelled number (SKU: D3705, P/N 123-4, Part # AB12) beats any guess */
+  var lm=s.match(/(?:^|\s)(?:SKU|P\/N|PN|PART\s*(?:NO\.?|NUMBER|#)|ITEM\s*(?:NO\.?|#)|MFR\s*#?)\s*[:#]?\s*([A-Z0-9][A-Z0-9\-\/\.]*[A-Z0-9])(?=\s|$)/i);
+  if(lm && /\d/.test(lm[1])) return {part:lm[1], desc:(s.slice(0,lm.index)+' '+s.slice(lm.index+lm[0].length)).replace(/\s+/g,' ').replace(/^\s+|\s+$/g,'')};
   if(w.length<2) return {part:'',desc:s};
   /* Aircraft Spruce: their own Part# (13-24416, 04-00614-25) wins over a MFR model number like PEN2530 */
   if(spruce) for(i=0;i<w.length;i++) if(/^\d{2}-\d{4,6}(-[A-Z0-9]+)?$/i.test(w[i])){ pick=i; break; }
@@ -2258,7 +2262,7 @@ var PO_IMP_ROLE=[
   [/DISCOUNT|\bDISC\b|\bTAX\b|\bBACK\b|\bUNIT\b|\bU\/M\b|\bUOM\b/i,'skip']
 ];
 function poImpRole(s){ for(var i=0;i<PO_IMP_ROLE.length;i++) if(PO_IMP_ROLE[i][0].test(s)) return PO_IMP_ROLE[i][1]; return ''; }
-function poImpMoney(s){ var m=String(s).replace(/,/g,'').match(/-?\$?\s*(\d+\.\d{2,3})\s*$/); return m?parseFloat(m[1]):null; }
+function poImpMoney(s){ var t=String(s).replace(/,/g,''), m=t.match(/(-?)\s*\$?\s*(-?)\s*(\d+\.\d{2,3})\)?\s*$/); if(!m) return null; var v=parseFloat(m[3]); return (m[1]||m[2]||/^\s*\(.*\)\s*$/.test(t))?-v:v; }
 function poImpIsMoney(s){ return /^\s*-?\$?\s*[\d,]+\.\d{2,3}\s*$/.test(String(s)); }
 function poImpIsQty(s){ return /^\s*\d+(?:\.\d+)?\s*$/.test(String(s)); }
 var PO_IMP_TOTKEY=[
@@ -2305,9 +2309,9 @@ function poImpGeneric(rows){
   var known=(typeof PO_CACHE!=='undefined'&&PO_CACHE&&PO_CACHE.vendors)||[];
   for(i=0;i<known.length&&!o.vendor;i++){
     var nm=String(known[i].name||known[i]||'');
-    if(nm && flat.toUpperCase().indexOf(nm.toUpperCase())>=0) o.vendor=nm;
+    if(nm && flat.toUpperCase().indexOf(nm.toUpperCase())>=0){ o.vendor=nm; o.vendorKnown=true; }
   }
-  if(!o.vendor){ for(i=0;i<rows.length;i++){ t=rows[i].text.replace(/^\s+|\s+$/g,''); if(t && t.length<48 && !/INVOICE|PAGE|DATE|^\d/i.test(t)){ o.vendor=t; break; } } }
+  if(!o.vendor){ for(i=0;i<rows.length;i++){ t=rows[i].text.replace(/^\s+|\s+$/g,''); if(t && t.length<48 && !/INVOICE|PAGE|DATE|ORDER|RECEIPT|NUMBER|PURCHASE|BILL|SHIP|CUSTOMER|^\d|#|\d{4,}/i.test(t) && !poImpDateUS(t)){ o.vendor=t; break; } } }
 
   /* PO number: his own numbering shape anywhere on the page beats any label */
   m=flat.match(/\bCJ[\s\-]*(20\d{2})[\s\-]*(\d{3})\b/i);
@@ -2376,7 +2380,7 @@ function poImpGeneric(rows){
   var T=rows.length, tot={};
   for(i=(H<0?0:H+1);i<rows.length;i++){
     t=rows[i].text.replace(/^\s+|\s+$/g,'');
-    m=t.match(/^([A-Za-z][A-Za-z&.\/ ]{2,34}?)\s*:?\s*\$?\s*(-?[\d,]+\.\d{2})\s*$/);
+    m=t.match(/^([A-Za-z][A-Za-z&.\/() ]{2,34}?)\s*:?\s*\$?\s*(-?[\d,]+\.\d{2})\s*$/);
     if(m){ var k=poImpTotKey(m[1]); if(k){ if(tot[k]==null) tot[k]=poImpMoney(m[2]); if(T===rows.length) T=i; continue; } }
     var labs=t.split(/\s{2,}/), keys=[], allLab=labs.length>=2;
     for(j=0;j<labs.length&&allLab;j++){ var kk=poImpTotKey(labs[j]); if(!kk||/\d\.\d{2}/.test(labs[j])) allLab=false; else keys.push(kk); }
@@ -2403,7 +2407,7 @@ function poImpGeneric(rows){
     return (best&&bd<140)?best.role:'desc';
   }
   var hasQtyCol=false, hasPartCol=false; for(i=0;i<cols.length;i++){ if(cols[i].role==='qty') hasQtyCol=true; if(cols[i].role==='part') hasPartCol=true; }
-  var last=null;
+  var L=[], BOIL=/THANK|NOTE|PLEASE|TERMS|REMIT|VISIT|QUESTION|RETURN|WARRANT|CERTIF|PAGE|SIGNATURE|SHORTAGE/i;
   for(i=H+1;i<T;i++){
     r=rows[i]; t=r.text.replace(/^\s+|\s+$/g,'');
     if(!t) continue;
@@ -2423,20 +2427,75 @@ function poImpGeneric(rows){
       descParts.push(s);
     }
     it.desc=descParts.join(' ').replace(/\s+/g,' ');
-    if(it.qty==='' && !hasQtyCol){ m=it.desc.match(/^(\d+)\s+(.+)$/); if(m){ it.qty=parseInt(m[1],10); it.desc=m[2]; } }
-    if(!it.part && !hasPartCol && it.desc){ var gp=poImpSplitPart(it.desc); if(gp.part){ it.part=gp.part; it.desc=gp.desc; } }
     if(it.amount==null && it.price!=='' && it.qty!=='') it.amount=Math.round(it.qty*it.price*100)/100;
-    if(it.amount!=null && (it.desc||it.part)){
-      if(it.price==='' && it.qty>0) it.price=Math.round(it.amount/it.qty*1000)/1000;
-      if(it.qty==='') it.qty=1;
-      o.items.push({qty:it.qty,part:it.part,desc:it.desc,price:it.price,amount:it.amount});
-      last=o.items[o.items.length-1];
-    } else if(last && !sawNum && it.qty==='' && it.desc && !/THANK|NOTE|PLEASE|TERMS|REMIT|VISIT|QUESTION|RETURN|WARRANT|CERTIF|PAGE|SIGNATURE|SHORTAGE/i.test(t)
-              && Math.abs(rows[i-1].y-r.y)<20){
-      last.desc=(last.desc+' '+it.desc).replace(/\s+/g,' ');
+    var anchor=(it.amount!=null);
+    if(!anchor && (!it.desc || BOIL.test(t))) continue;
+    L.push({y:r.y, it:it, anchor:anchor, sawNum:sawNum});
+  }
+
+  /* Group rows into blocks split by the bigger vertical gaps between items (store receipts print each
+     item as several lines with its price centred on the block). A block holding one price is one item,
+     every line of text in it is that item's description. Dense invoices with even spacing fall back to
+     one price row per item plus the wrapped lines under it. */
+  var gaps=[], k;
+  for(k=1;k<L.length;k++) gaps.push(L[k-1].y-L[k].y);
+  var med=0; if(gaps.length){ var gs=gaps.slice().sort(function(a,b){return a-b;}); med=gs[Math.floor(gs.length/2)]; }
+  var thr=Math.max(med*1.6, med+6), blocks=[], cur=[];
+  for(k=0;k<L.length;k++){ if(k>0 && gaps[k-1]>thr && cur.length){ blocks.push(cur); cur=[]; } cur.push(L[k]); }
+  if(cur.length) blocks.push(cur);
+
+  function addItem(it){
+    if(it.qty==='' && !hasQtyCol){ var qm=it.desc.match(/^(\d+)\s+(.+)$/); if(qm){ it.qty=parseInt(qm[1],10); it.desc=qm[2]; } }
+    if(!it.part && !hasPartCol && it.desc){ var gp=poImpSplitPart(it.desc); if(gp.part){ it.part=gp.part; it.desc=gp.desc; } }
+    if(!it.desc && !it.part) return null;
+    if(it.amount>0 && /DISCOUNT|COUPON|PROMO|REBATE|CREDIT/i.test(it.desc) && it.qty==='') it.amount=-it.amount;
+    if(it.qty==='') it.qty=1;
+    if(it.price==='' && it.qty) it.price=Math.round(it.amount/it.qty*1000)/1000;
+    var row={qty:it.qty,part:it.part,desc:it.desc,price:it.price,amount:it.amount};
+    o.items.push(row); return row;
+  }
+  var last=null, lastY=null, b, n;
+  for(b=0;b<blocks.length;b++){
+    var bl=blocks[b], anc=[];
+    for(n=0;n<bl.length;n++) if(bl[n].anchor) anc.push(bl[n]);
+    if(anc.length===1){
+      var one=anc[0].it, words=[];
+      for(n=0;n<bl.length;n++) if(bl[n].it.desc) words.push(bl[n].it.desc);
+      one.desc=words.join(' ').replace(/\s+/g,' ');
+      if(!one.part) for(n=0;n<bl.length;n++) if(bl[n].it.part){ one.part=bl[n].it.part; break; }
+      var made=addItem(one); if(made){ last=made; lastY=bl[bl.length-1].y; }
+      continue;
+    }
+    for(n=0;n<bl.length;n++){
+      var e=bl[n];
+      if(e.anchor){ var mk=addItem(e.it); if(mk){ last=mk; lastY=e.y; } }
+      else if(last && !e.sawNum && e.it.qty==='' && e.it.desc && lastY!=null && Math.abs(lastY-e.y)<20){
+        last.desc=(last.desc+' '+e.it.desc).replace(/\s+/g,' '); lastY=e.y;
+      }
     }
   }
   if(!o.items.length) o.warnings.push('No line items could be read.');
+
+  /* vendor fallback when the Vendors tab didn't name it */
+  if(!o.vendorKnown){
+    var vend='';
+    m=all.match(/THANK\s+YOU\s+FOR\s+(?:YOUR\s+)?(?:ORDER|SHOPPING|PURCHASING|PURCHASE|BUSINESS)\s+(?:WITH|FROM|AT)\s+(?!US\b)([A-Z][A-Za-z0-9'\u2019&.\- ]{2,30}?)\s*[.!,\n]/i);
+    if(m) vend=m[1];
+    if(!vend){ for(i=0;i<rows.length-1;i++) if(/THANK\s+YOU/i.test(rows[i].text)){ t=rows[i+1].text.replace(/^\s+|\s+$/g,''); if(t && t.length<40 && !/\d{3}|@|\.COM/i.test(t)) vend=t; break; } }
+    if(!vend){
+      var pos=[]; for(i=0;i<o.items.length;i++) if(o.items[i].amount>0) pos.push(o.items[i].desc.split(' '));
+      if(pos.length>=2){ var cw=[]; for(k=0;k<pos[0].length;k++){ var ok=true; for(n=1;n<pos.length;n++) if(pos[n][k]!==pos[0][k]) ok=false; if(!ok) break; cw.push(pos[0][k]); }
+        if(cw.length && cw.length<=4 && cw.join(' ').length>=4 && /[A-Za-z]{3}/.test(cw.join(' '))) vend=cw.join(' '); }
+    }
+    if(!vend){ m=all.match(/(?:@|www\.|\b)([a-z0-9\-]{3,})\.(?:com|net|org|us|co)\b/i); if(m && !/gmail|icloud|yahoo|outlook|hotmail|aol|cjaviation|me$/i.test(m[1])) vend=m[1].charAt(0).toUpperCase()+m[1].slice(1); }
+    if(vend) o.vendor=vend.replace(/^\s+|\s+$/g,'');
+  }
+  /* drop the brand name from the front of each description when it's the vendor's own name */
+  var vk=poImpKey(o.vendor);
+  if(vk.length>=4) for(i=0;i<o.items.length;i++){
+    var dw=o.items[i].desc.split(' '), acc='';
+    for(k=0;k<dw.length-1;k++){ acc+=poImpKey(dw[k]); if(acc===vk){ o.items[i].desc=dw.slice(k+1).join(' '); break; } if(acc.length>=vk.length) break; }
+  }
   return o;
 }
 
