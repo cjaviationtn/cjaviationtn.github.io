@@ -420,7 +420,11 @@ function opsCalCard(){
   }
 
   var extra='';
-  if(outcal) extra+='<div style="margin-top:10px;font-size:10.5px;color:var(--muted)">'+outcal+' out for calibration</div>';
+  if(outcal) extra+='<div style="margin-top:8px;padding:11px;background:#fdf6e9;border:1px solid #f0d9ae;border-radius:9px;'
+                  + 'font-size:11.5px;color:#9a6512;font-weight:600;display:flex;align-items:center;gap:6px">'
+                  + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none">'
+                  + '<circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M5 17H3V6a1 1 0 0 1 1-1h9v12M9 17h6M13 9h5l3 4v4h-2"/></svg>'
+                  + outcal+(outcal===1?' tool':' tools')+' out for calibration</div>';
   if(nodate) extra+='<div style="margin-top:6px;font-size:10.5px" class="warnc">'+nodate+' with no due date</div>';
 
   if(!due.length) return opsShell('cal','Tool Calibration Due','0','pos','Nothing due in 30 days',
