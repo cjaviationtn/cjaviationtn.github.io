@@ -1812,8 +1812,8 @@ function loadPO(){
 function poStatusLabel(status){ return status==='Closed/Paid'?'Closed':(status||'—'); }
 function poPaidChip(p){
   if(p.status==='Cancelled') return '';
-  if(p.paid) return '<span class="chip" style="background:#dcefe2;color:#256a3f;border-color:#256a3f33;font-weight:700;margin-left:6px">\u2713 Paid</span>'
-    + '<button class="btn ghost" type="button" style="padding:2px 7px;font-size:11px;margin-left:4px" data-popaid="'+p.row+'" data-to="0" title="Mark unpaid">\u00d7</button>';
+  if(p.paid) return '<span style="white-space:nowrap;display:inline-block"><span class="chip" style="background:#dcefe2;color:#256a3f;border-color:#256a3f33;font-weight:700;margin-left:6px">\u2713 Paid</span>'
+    + '<button class="btn ghost" type="button" style="padding:2px 7px;font-size:11px;margin-left:4px" data-popaid="'+p.row+'" data-to="0" title="Mark unpaid">\u00d7</button></span>';
   return '<button class="btn ghost" type="button" style="padding:3px 9px;font-size:12px;margin-left:6px;border-color:#8a6d1e55;color:#8a6d1e" data-popaid="'+p.row+'" data-to="1">Mark paid</button>';
 }
 function poToday_(){ return new Date().toISOString().slice(0,10); }
@@ -1894,11 +1894,11 @@ function paintPO(){
         + '<td>'+esc(p.vendor)+'</td>'
         + '<td>'+esc(p.wo)+'</td>'
         + '<td>'+esc(poTypeLabel(p.type))+'</td>'
-        + '<td>'+esc(p.desc)+'</td>'
-        + '<td style="white-space:nowrap">'+poChip(p.status)+poPaidChip(p)+'</td>'
+        + '<td class="po-desc"><div title="'+esc(p.desc)+'">'+esc(p.desc)+'</div></td>'
+        + '<td class="po-st">'+poChip(p.status)+poPaidChip(p)+(p.received?'<span class="po-rcvd">Rcvd '+esc(poFmtDate(p.received))+'</span>':'')+'</td>'
         + '<td class="num">'+(p.total!=null?money(p.total):'')+'</td>'
         + '<td style="white-space:nowrap">'+esc(poFmtDate(p.received))+'</td>'
-        + '<td style="white-space:nowrap">'+esc(p.invoice)+' <button class="btn ghost" style="padding:4px 10px;font-size:12px" data-popdf="'+p.row+'">PDF</button> <button class="btn ghost" style="padding:4px 10px;font-size:12px" data-poedit="'+p.row+'">Update</button></td>'
+        + '<td class="po-act">'+(p.invoice?'<span class="po-inv">'+esc(p.invoice)+'</span> ':'')+'<span class="po-btns"><button class="btn ghost" style="padding:4px 10px;font-size:12px" data-popdf="'+p.row+'">PDF</button> <button class="btn ghost" style="padding:4px 10px;font-size:12px" data-poedit="'+p.row+'">Update</button></span></td>'
         + '</tr>';
     }
   }
