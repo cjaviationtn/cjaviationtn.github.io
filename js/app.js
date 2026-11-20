@@ -419,8 +419,8 @@ function opsCalCard(){
     if(b==='over'||b==='soon'){ if(b==='over') over++; due.push(all[i]); }
   }
 
-  var extra='';
-  if(outcal) extra+='<div style="margin-top:8px;padding:11px;background:#fdf6e9;border:1px solid #f0d9ae;border-radius:9px;'
+  var extra='';  /* amber/attention notes render ABOVE the green all-clear box or the due list */
+  if(outcal) extra+='<div style="margin-top:11px;padding:11px;background:#fdf6e9;border:1px solid #f0d9ae;border-radius:9px;'
                   + 'font-size:11.5px;color:#9a6512;font-weight:600;display:flex;align-items:center;gap:6px">'
                   + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none">'
                   + '<circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M5 17H3V6a1 1 0 0 1 1-1h9v12M9 17h6M13 9h5l3 4v4h-2"/></svg>'
@@ -428,7 +428,7 @@ function opsCalCard(){
   if(nodate) extra+='<div style="margin-top:6px;font-size:10.5px" class="warnc">'+nodate+' with no due date</div>';
 
   if(!due.length) return opsShell('cal','Tool Calibration Due','0','pos','Nothing due in 30 days',
-    opsNote('No calibrations coming up.')+extra);
+    extra+opsNote('No calibrations coming up.'));
 
   due.sort(function(a,b){ return calDays(a)-calDays(b); });
 
@@ -442,7 +442,7 @@ function opsCalCard(){
   }
   return opsShell('cal','Tool Calibration Due',String(due.length),(over?'neg':'warnc'),
     (over?'<span class="neg">'+over+' overdue</span> · next 30 days':'Within the next 30 days'),
-    opsRows(rows)+extra);
+    extra+opsRows(rows));
 }
 
 function tile(cls,label,val,foot){ return '<div class="tile '+cls+'"><div class="accent"></div><div class="label">'+label+'</div><div class="val small">'+val+'</div>'+(foot?'<div class="foot">'+foot+'</div>':'')+'</div>'; }
