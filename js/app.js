@@ -428,7 +428,7 @@ function opsCalCard(){
   if(nodate) extra+='<div style="margin-top:6px;font-size:10.5px" class="warnc">'+nodate+' with no due date</div>';
 
   if(!due.length) return opsShell('cal','Tool Calibration Due','0','pos','Nothing due in 30 days',
-    extra+opsNote('No calibrations coming up.'));
+    extra||opsNote('No calibrations coming up.'));   /* any amber note replaces the green all-clear box */
 
   due.sort(function(a,b){ return calDays(a)-calDays(b); });
 
