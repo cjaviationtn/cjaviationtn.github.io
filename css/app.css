@@ -664,6 +664,7 @@
 .fin-foot-r{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .fin-foot-r .print-controls{display:flex;gap:8px;flex-wrap:wrap}
 .fin-foot .hint{flex-basis:100%}
+.fin-page{container-type:inline-size}
 .fin-kpis{grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px}
 .fin-kpis .tile{padding:12px 12px 12px 16px}
 .fin-kpis .tile .val.small{font-size:19px;white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -729,6 +730,9 @@
 .fin-eqrow.end{font-weight:800;background:#eef3f7;margin:4px -16px 0;padding:10px 16px;border:0;color:var(--navy-d);font-size:14.5px}
 
 @media (max-width:1100px){ .fin-kpis{grid-template-columns:repeat(3,1fr)} }
+/* Money-at-a-glance: go to 3 across based on the room the dashboard actually has (sidebar included),
+   not the screen width -- iPad landscape with the sidebar open was clipping $14,832.57 at 6 across */
+@container (max-width:1040px){ .fin-kpis{grid-template-columns:repeat(3,1fr)} }
 @media (max-width:900px){ .fin-cols{grid-template-columns:1fr} }
 @media (max-width:620px){
   .fin-kpis{grid-template-columns:1fr 1fr !important;gap:8px}
